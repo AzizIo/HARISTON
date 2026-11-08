@@ -405,12 +405,9 @@ async def team_contact(message: Message, state: FSMContext) -> None:
     elif contact and not contact.startswith("https://"):
         await message.answer("Ссылка должна начинаться с https:// или отправьте символ - .")
         return
-    item_id = await add_team_member(
-        data["team_name"], data["team_role"], data["team_description"], contact
-    )
-    await log_admin_action(message.from_user.id, f"added_team_member:{item_id}")
-    await state.clear()
-    await message.answer("✅ Участник добавлен в раздел «Команда».")
+    await state.update_data(team_contact=contact)
+    await state.set_state(AdminFlow.team_photo)
+    await message.answer("Пришлите фото участника или отправьте - чтобы пропустить.")
 
 
 @router.message(AdminFlow.broadcast_text)
@@ -561,3 +558,26 @@ async def receive_site_setting(message: Message, state: FSMContext) -> None:
     await log_admin_action(message.from_user.id, f"updated_setting:{key}")
     await state.clear()
     await message.answer("✅ Настройка проекта сохранена.")
+
+
+@router.message(AdminFlow.team_photo)
+async def team_photo(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    photo_file_id = message.photo[-1].file_id if message.photo else None
+    if not photo_file_id and (message.text or "").strip() != "-":
+        await message.answer("Отправьте фотографию или символ - чтобы пропустить.")
+        return
+    data = await state.get_data()
+    item_id = await add_team_member(
+        data["team_name"],
+        data["team_role"],
+        data["team_description"],
+        data["team_contact"],
+        photo_file_id,
+    )
+    await log_admin_action(message.from_user.id, f"added_team_member:{item_id}")
+    await state.clear()
+    await message.answer("✅ Карточка участника добавлена.")
