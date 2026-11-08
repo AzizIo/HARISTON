@@ -7,9 +7,9 @@ from aiogram.types import CallbackQuery, Message
 from app.config import settings
 from app.database import (
     add_channel, add_lesson, add_news, add_team_member, get_news, get_stats,
-    get_user_ids, log_admin_action,
+    get_user_ids, log_admin_action, record_broadcast,
 )
-from app.keyboards import admin_flow_menu, admin_menu, broadcast_confirmation
+from app.keyboards import admin_flow_menu, admin_menu, broadcast_confirmation, broadcast_category_menu
 from app.services.broadcast import send_broadcast
 from app.states import AdminFlow
 
@@ -62,14 +62,16 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
             await callback.answer("Черновик рассылки не найден", show_alert=True)
             return
         await state.clear()
-        recipients = await get_user_ids(notifications_only=True)
+        category = data.get("broadcast_category", "announcements")
+        recipients = await get_user_ids(notifications_only=True, category=category)
         status = await callback.message.edit_text(
             f"📣 <b>Рассылка запущена</b>\n\nПолучателей: {len(recipients)}. Это может занять некоторое время."
         )
         result = await send_broadcast(callback.bot, recipients, draft)
+        await record_broadcast(callback.from_user.id, result.total, result.sent, result.blocked, result.failed)
         await log_admin_action(
             callback.from_user.id,
-            f"broadcast:total={result.total},sent={result.sent},blocked={result.blocked},failed={result.failed}",
+            f"broadcast:{category}:total={result.total},sent={result.sent},blocked={result.blocked},failed={result.failed}",
         )
         await status.edit_text(
             "<b>Рассылка завершена</b>\n\n"
@@ -259,11 +261,14 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
         await message.answer("Сообщение не должно быть пустым. Попробуйте ещё раз.")
         return
     await state.update_data(broadcast_text=text)
-    recipients = await get_user_ids(notifications_only=True)
+    data = await state.get_data()
+    category = data.get("broadcast_category", "announcements")
+    recipients = await get_user_ids(notifications_only=True, category=category)
     await state.set_state(AdminFlow.broadcast_confirm)
     await message.answer(
         "<b>Предпросмотр рассылки</b>\n\n"
         f"{text[:3000]}\n\n"
+        f"Категория: <b>{category}</b>\n"
         f"Получателей с включёнными уведомлениями: <b>{len(recipients)}</b>\n\n"
         "Отправить сообщение всем выбранным пользователям?",
         reply_markup=broadcast_confirmation(),
