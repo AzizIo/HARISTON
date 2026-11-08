@@ -73,6 +73,7 @@ def admin_menu() -> InlineKeyboardMarkup:
         ("Добавить сотрудника", "admin:team_new", "team", None),
         ("Рассылка", "admin:broadcast", "broadcast", "success"),
         ("Пользователи", "admin:users", "users", None),
+        ("Настройки проекта", "admin:settings", "settings", "primary"),
         ("Главное меню", "menu:home", "back", None),
     ]
     for text, callback, emoji, style in items:
@@ -137,4 +138,13 @@ def confirm_news_delete(news_id: int) -> InlineKeyboardMarkup:
     _button(kb, "Да, удалить", f"admin:news_delete_confirm:{news_id}", "cancel", "danger")
     _button(kb, "Отмена", "admin:news_list", "back")
     kb.adjust(1, 1)
+    return kb.as_markup()
+
+
+def site_settings_menu() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Описание проекта", "admin:setting_about", "info", "primary")
+    _button(kb, "Контактная ссылка", "admin:setting_contact", "contact", "success")
+    _button(kb, "Назад в панель", "admin:home", "back")
+    kb.adjust(1, 1, 1)
     return kb.as_markup()
