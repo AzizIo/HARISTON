@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message
 from app.config import settings
 from app.database import (
     add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news, get_stats,
-    get_user_ids, log_admin_action, record_broadcast,
+    get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
 )
 from app.keyboards import admin_flow_menu, admin_menu, broadcast_confirmation, broadcast_category_menu
 from app.services.broadcast import send_broadcast
@@ -107,11 +107,38 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_text("📰 <b>Новая публикация</b>\n\nОтправьте заголовок новости.", reply_markup=admin_flow_menu())
     elif action == "news_list":
         items = await get_news(10)
-        text = "<b>📰 Последние публикации</b>\n\n" + (
-            "\n\n".join(f"<b>#{item['id']} · {item['title']}</b>\n{item['body'][:250]}" for item in items)
+        text = "<b>📰 Управление публикациями</b>\n\n" + (
+            "\n\n".join(f"<b>#{item['id']} · {item['title']}</b>\n{item['body'][:180]}" for item in items)
             if items else "Новостей пока нет."
         )
-        await callback.message.edit_text(text, reply_markup=admin_menu())
+        await callback.message.edit_text(text, reply_markup=news_management(items))
+    elif action.startswith("news_delete_confirm:"):
+        news_id = int(action.split(":", 1)[1])
+        deleted = await delete_news(news_id)
+        await log_admin_action(callback.from_user.id, f"deleted_news:{news_id}")
+        await callback.message.edit_text(
+            "🗑 Новость удалена." if deleted else "Новость уже отсутствует.",
+            reply_markup=admin_menu(),
+        )
+    elif action.startswith("news_delete:"):
+        news_id = int(action.split(":", 1)[1])
+        await callback.message.edit_text(
+            f"Подтвердите удаление новости #{news_id}. Это действие нельзя отменить.",
+            reply_markup=confirm_news_delete(news_id),
+        )
+    elif action.startswith("news_edit:"):
+        news_id = int(action.split(":", 1)[1])
+        items = await get_news(100)
+        item = next((row for row in items if int(row["id"]) == news_id), None)
+        if item is None:
+            await callback.answer("Новость не найдена", show_alert=True)
+            return
+        await state.update_data(edit_news_id=news_id)
+        await state.set_state(AdminFlow.news_edit_title)
+        await callback.message.edit_text(
+            f"Текущий заголовок: <b>{item['title']}</b>\n\nОтправьте новый заголовок.",
+            reply_markup=admin_flow_menu(),
+        )
     elif action == "channel_new":
         await state.set_state(AdminFlow.channel_title)
         await callback.message.edit_text("📢 <b>Добавление канала</b>\n\nОтправьте название канала.", reply_markup=admin_flow_menu())
@@ -375,3 +402,36 @@ async def media_upload(message: Message, state: FSMContext) -> None:
     await log_admin_action(message.from_user.id, f"added_media:{media_id}")
     await state.clear()
     await message.answer(f"✅ Материал HARISTON MEDIA #{media_id} добавлен.")
+
+
+@router.message(AdminFlow.news_edit_title)
+async def receive_news_edit_title(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    title = (message.text or "").strip()
+    if not title or len(title) > 180:
+        await message.answer("Заголовок должен содержать от 1 до 180 символов.")
+        return
+    await state.update_data(edit_news_title=title)
+    await state.set_state(AdminFlow.news_edit_body)
+    await message.answer("Отправьте новый текст публикации.")
+
+
+@router.message(AdminFlow.news_edit_body)
+async def receive_news_edit_body(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    body = (message.text or message.caption or "").strip()
+    if not body:
+        await message.answer("Текст публикации не должен быть пустым.")
+        return
+    data = await state.get_data()
+    updated = await update_news(data["edit_news_id"], data["edit_news_title"], body)
+    if updated:
+        await log_admin_action(message.from_user.id, f"updated_news:{data['edit_news_id']}")
+    await state.clear()
+    await message.answer("✅ Публикация обновлена." if updated else "Публикация не найдена.")
