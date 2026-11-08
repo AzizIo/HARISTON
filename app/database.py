@@ -44,7 +44,8 @@ async def init_db() -> None:
                 name TEXT NOT NULL,
                 role TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
-                contact_url TEXT NOT NULL DEFAULT ''
+                contact_url TEXT NOT NULL DEFAULT '',
+                photo_file_id TEXT
             );
             CREATE TABLE IF NOT EXISTS notification_preferences (
                 telegram_id INTEGER NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
@@ -87,6 +88,9 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE users ADD COLUMN referral_code TEXT")
         if "referred_by" not in columns:
             await db.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER REFERENCES users(telegram_id)")
+        team_columns = {row[1] for row in await (await db.execute("PRAGMA table_info(team_members)")).fetchall()}
+        if "photo_file_id" not in team_columns:
+            await db.execute("ALTER TABLE team_members ADD COLUMN photo_file_id TEXT")
         await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_users_notifications ON users(notifications_enabled)")
         await db.commit()
@@ -308,11 +312,16 @@ async def get_lessons():
         return await cursor.fetchall()
 
 
-async def add_team_member(name: str, role: str, description: str, contact_url: str) -> int:
+async def add_team_member(
+    name: str, role: str, description: str, contact_url: str,
+    photo_file_id: str | None = None,
+) -> int:
     async with aiosqlite.connect(settings.database_path) as db:
         cursor = await db.execute(
-            "INSERT INTO team_members (name, role, description, contact_url) VALUES (?, ?, ?, ?)",
-            (name, role, description, contact_url),
+            """INSERT INTO team_members
+               (name, role, description, contact_url, photo_file_id)
+               VALUES (?, ?, ?, ?, ?)""",
+            (name, role, description, contact_url, photo_file_id),
         )
         await db.commit()
         return int(cursor.lastrowid)
