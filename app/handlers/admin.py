@@ -83,18 +83,18 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_text(text, reply_markup=admin_menu())
     elif action == "channel_new":
         await state.set_state(AdminFlow.channel_title)
-        await callback.message.edit_text("📢 <b>Добавление канала</b>\n\nОтправьте название канала.", reply_markup=back_menu())
+        await callback.message.edit_text("📢 <b>Добавление канала</b>\n\nОтправьте название канала.", reply_markup=admin_flow_menu())
     elif action == "lesson_new":
         await state.set_state(AdminFlow.lesson_title)
-        await callback.message.edit_text("🎓 <b>Новый обучающий материал</b>\n\nОтправьте название урока.", reply_markup=back_menu())
+        await callback.message.edit_text("🎓 <b>Новый обучающий материал</b>\n\nОтправьте название урока.", reply_markup=admin_flow_menu())
     elif action == "team_new":
         await state.set_state(AdminFlow.team_name)
-        await callback.message.edit_text("👤 <b>Новый участник команды</b>\n\nОтправьте имя или псевдоним.", reply_markup=back_menu())
+        await callback.message.edit_text("👤 <b>Новый участник команды</b>\n\nОтправьте имя или псевдоним.", reply_markup=admin_flow_menu())
     elif action == "broadcast":
         await state.set_state(AdminFlow.broadcast_text)
         await callback.message.edit_text(
             "📣 <b>Рассылка</b>\n\nОтправьте текст сообщения. Оно будет разослано пользователям, включившим уведомления.",
-            reply_markup=back_menu(),
+            reply_markup=admin_flow_menu(),
         )
     await callback.answer()
 
