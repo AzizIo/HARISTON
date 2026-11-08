@@ -75,12 +75,33 @@ def admin_menu() -> InlineKeyboardMarkup:
         ("История рассылок", "admin:broadcast_history", "list", None),
         ("Пользователи", "admin:users", "users", None),
         ("Управление контентом", "admin:manage_content", "list", "primary"),
+        ("Обязательная подписка", "admin:required_channels", "channels", "success"),
         ("Настройки проекта", "admin:settings", "settings", "primary"),
         ("Главное меню", "menu:home", "back", None),
     ]
     for text, callback, emoji, style in items:
         _button(kb, text, callback, emoji, style)
-    kb.adjust(2, 2, 2, 2, 1)
+    kb.adjust(2, 2, 2, 2, 2, 2, 1)
+    return kb.as_markup()
+
+
+def required_channels_admin_menu(items) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for item in items:
+        label = str(item["title"])[:28]
+        channel_id = int(item["id"])
+        _button(kb, f"🗑 Удалить: {label}", f"admin:required_channel_delete:{channel_id}", "cancel", "danger")
+    _button(kb, "➕ Добавить канал", "admin:required_channel_add", "add", "success")
+    _button(kb, "↩️ Назад в панель", "admin:home", "back")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def confirm_required_channel_delete(channel_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Да, удалить", f"admin:required_channel_delete_confirm:{channel_id}", "cancel", "danger")
+    _button(kb, "Отмена", "admin:required_channels", "back")
+    kb.adjust(1, 1)
     return kb.as_markup()
 
 
