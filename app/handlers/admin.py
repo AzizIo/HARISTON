@@ -8,7 +8,8 @@ from app.config import settings
 from app.database import (
     add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news, get_stats,
     get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
-    set_site_setting,
+    set_site_setting, get_channels, get_lessons, get_team, get_media_items,
+    delete_channel, delete_lesson, delete_team_member, delete_media_item,
 )
 from app.keyboards import (
     admin_flow_menu, admin_menu, broadcast_confirmation,
