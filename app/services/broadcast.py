@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 
 from aiogram import Bot
@@ -40,7 +41,7 @@ async def _deliver(bot: Bot, chat_id: int, text: str, parse_mode: str | None) ->
         return "blocked"
     except TelegramRetryAfter as exc:
         # Telegram explicitly tells us when this recipient may be retried.
-        await asyncio.sleep(min(float(exc.retry_after) + 0.2, 30.0))
+        await asyncio.sleep(float(exc.retry_after) + 0.2)
         try:
             await bot.send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
             return "sent"
@@ -64,6 +65,7 @@ async def send_broadcast(
     *,
     parse_mode: str | None = None,
     concurrency: int = 15,
+    min_interval: float = 0.04,
 ) -> BroadcastResult:
     """Send a message to a stable recipient snapshot with bounded concurrency."""
     if not text.strip():
@@ -72,12 +74,23 @@ async def send_broadcast(
         raise ValueError("Broadcast text exceeds Telegram's 4096-character limit")
     if concurrency < 1:
         raise ValueError("Concurrency must be positive")
+    if min_interval < 0:
+        raise ValueError("Minimum interval cannot be negative")
 
     unique_recipients = list(dict.fromkeys(recipients))
     semaphore = asyncio.Semaphore(concurrency)
+    rate_lock = asyncio.Lock()
+    last_started = 0.0
 
     async def deliver(chat_id: int) -> str:
+        nonlocal last_started
         async with semaphore:
+            async with rate_lock:
+                now = time.monotonic()
+                delay = min_interval - (now - last_started)
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                last_started = time.monotonic()
             return await _deliver(bot, chat_id, text, parse_mode)
 
     outcomes = await asyncio.gather(*(deliver(chat_id) for chat_id in unique_recipients))
