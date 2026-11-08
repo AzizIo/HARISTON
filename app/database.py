@@ -124,6 +124,12 @@ async def register_user(
             "SELECT referral_code FROM users WHERE telegram_id=?", (telegram_id,)
         )).fetchone()
         code = row[0]
+        if not code:
+            code = own_code
+            await db.execute(
+                "UPDATE users SET referral_code=? WHERE telegram_id=?",
+                (code, telegram_id),
+            )
         await db.commit()
         return str(code)
 
@@ -319,13 +325,27 @@ async def get_team():
         return await cursor.fetchall()
 
 
-async def get_user_ids(notifications_only: bool = False) -> list[int]:
+async def get_user_ids(
+    notifications_only: bool = False, category: str | None = None
+) -> list[int]:
     async with aiosqlite.connect(settings.database_path) as db:
-        query = "SELECT telegram_id FROM users"
-        if notifications_only:
-            query += " WHERE notifications_enabled=1"
-        cursor = await db.execute(query)
-        return [row[0] for row in await cursor.fetchall()]
+        if category is not None:
+            if category not in {"news", "announcements", "media"}:
+                raise ValueError("Unsupported notification category")
+            cursor = await db.execute(
+                """SELECT u.telegram_id FROM users AS u
+                   LEFT JOIN notification_preferences AS p
+                     ON p.telegram_id=u.telegram_id AND p.category=?
+                   WHERE u.notifications_enabled=1 AND COALESCE(p.enabled, 1)=1""",
+                (category,),
+            )
+        elif notifications_only:
+            cursor = await db.execute(
+                "SELECT telegram_id FROM users WHERE notifications_enabled=1"
+            )
+        else:
+            cursor = await db.execute("SELECT telegram_id FROM users")
+        return [int(row[0]) for row in await cursor.fetchall()]
 
 
 async def get_stats() -> tuple[int, int]:
