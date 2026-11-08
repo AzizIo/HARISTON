@@ -217,7 +217,7 @@ async def receive_news_body(message: Message, state: FSMContext) -> None:
     )
     await state.clear()
     await message.answer(
-        f"✅ Новость <b>#{news_id}</b> опубликована.\\n"
+        f"✅ Новость <b>#{news_id}</b> опубликована.\n"
         f"🔔 Уведомления: {delivery.sent}/{delivery.total} доставлено."
     )
 
