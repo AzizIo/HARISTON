@@ -10,6 +10,7 @@ from app.database import (
     get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
     set_site_setting, get_channels, get_lessons, get_team, get_media_items,
     delete_channel, delete_lesson, delete_team_member, delete_media_item,
+    get_dashboard_stats, get_broadcast_history,
 )
 from app.keyboards import (
     admin_flow_menu, admin_menu, broadcast_confirmation,
