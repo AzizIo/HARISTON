@@ -15,7 +15,9 @@ async def init_db() -> None:
                 username TEXT,
                 full_name TEXT NOT NULL,
                 joined_at TEXT NOT NULL,
-                notifications_enabled INTEGER NOT NULL DEFAULT 1
+                notifications_enabled INTEGER NOT NULL DEFAULT 1,
+                referral_code TEXT UNIQUE,
+                referred_by INTEGER REFERENCES users(telegram_id)
             );
             CREATE TABLE IF NOT EXISTS news (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,6 +46,34 @@ async def init_db() -> None:
                 description TEXT NOT NULL DEFAULT '',
                 contact_url TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS notification_preferences (
+                telegram_id INTEGER NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
+                category TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (telegram_id, category)
+            );
+            CREATE TABLE IF NOT EXISTS media_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                file_id TEXT NOT NULL,
+                media_type TEXT NOT NULL CHECK(media_type IN ('photo', 'video', 'document')),
+                caption TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                created_by INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS site_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS broadcast_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id INTEGER NOT NULL,
+                total INTEGER NOT NULL,
+                sent INTEGER NOT NULL,
+                blocked INTEGER NOT NULL,
+                failed INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS admin_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 admin_id INTEGER NOT NULL,
@@ -52,20 +82,169 @@ async def init_db() -> None:
             );
             """
         )
+        columns = {row[1] for row in await (await db.execute("PRAGMA table_info(users)")).fetchall()}
+        if "referral_code" not in columns:
+            await db.execute("ALTER TABLE users ADD COLUMN referral_code TEXT")
+        if "referred_by" not in columns:
+            await db.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER REFERENCES users(telegram_id)")
+        await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_users_notifications ON users(notifications_enabled)")
         await db.commit()
 
 
-async def register_user(telegram_id: int, username: str | None, full_name: str) -> None:
+async def register_user(
+    telegram_id: int,
+    username: str | None,
+    full_name: str,
+    invite_code: str | None = None,
+) -> str:
+    """Upsert a user and attribute a referral only on the first registration."""
+    import secrets
+
+    now = datetime.now(timezone.utc).isoformat()
+    own_code = secrets.token_urlsafe(8)
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        referrer = None
+        if invite_code:
+            row = await (await db.execute(
+                "SELECT telegram_id FROM users WHERE referral_code=? AND telegram_id<>?",
+                (invite_code, telegram_id),
+            )).fetchone()
+            referrer = int(row[0]) if row else None
+        await db.execute(
+            """INSERT INTO users
+               (telegram_id, username, full_name, joined_at, referral_code, referred_by)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(telegram_id) DO UPDATE SET
+               username=excluded.username, full_name=excluded.full_name""",
+            (telegram_id, username, full_name, now, own_code, referrer),
+        )
+        row = await (await db.execute(
+            "SELECT referral_code FROM users WHERE telegram_id=?", (telegram_id,)
+        )).fetchone()
+        code = row[0]
+        await db.commit()
+        return str(code)
+
+
+async def get_referral_stats(telegram_id: int) -> int:
+    async with aiosqlite.connect(settings.database_path) as db:
+        row = await (await db.execute(
+            "SELECT COUNT(*) FROM users WHERE referred_by=?", (telegram_id,)
+        )).fetchone()
+        return int(row[0])
+
+
+async def get_referral_code(telegram_id: int) -> str | None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        row = await (await db.execute(
+            "SELECT referral_code FROM users WHERE telegram_id=?", (telegram_id,)
+        )).fetchone()
+        return str(row[0]) if row and row[0] else None
+
+
+async def set_notification_preference(telegram_id: int, category: str, enabled: bool) -> None:
+    allowed = {"news", "announcements", "media"}
+    if category not in allowed:
+        raise ValueError("Unsupported notification category")
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """INSERT INTO notification_preferences (telegram_id, category, enabled)
+               VALUES (?, ?, ?)
+               ON CONFLICT(telegram_id, category) DO UPDATE SET enabled=excluded.enabled""",
+            (telegram_id, category, int(enabled)),
+        )
+        await db.commit()
+
+
+async def get_notification_preferences(telegram_id: int) -> dict[str, bool]:
+    defaults = {"news": True, "announcements": True, "media": True}
+    async with aiosqlite.connect(settings.database_path) as db:
+        rows = await (await db.execute(
+            "SELECT category, enabled FROM notification_preferences WHERE telegram_id=?",
+            (telegram_id,),
+        )).fetchall()
+    defaults.update({category: bool(enabled) for category, enabled in rows})
+    return defaults
+
+
+async def record_broadcast(
+    admin_id: int, total: int, sent: int, blocked: int, failed: int
+) -> None:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute(
-            """INSERT INTO users (telegram_id, username, full_name, joined_at)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(telegram_id) DO UPDATE SET username=excluded.username,
-               full_name=excluded.full_name""",
-            (telegram_id, username, full_name, now),
+            """INSERT INTO broadcast_logs
+               (admin_id, total, sent, blocked, failed, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (admin_id, total, sent, blocked, failed, now),
         )
         await db.commit()
+
+
+async def get_broadcast_history(limit: int = 10):
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM broadcast_logs ORDER BY id DESC LIMIT ?", (limit,)
+        )
+        return await cursor.fetchall()
+
+
+async def set_site_setting(key: str, value: str) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """INSERT INTO site_settings (key, value) VALUES (?, ?)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value""",
+            (key, value),
+        )
+        await db.commit()
+
+
+async def get_site_setting(key: str, default: str = "") -> str:
+    async with aiosqlite.connect(settings.database_path) as db:
+        row = await (await db.execute(
+            "SELECT value FROM site_settings WHERE key=?", (key,)
+        )).fetchone()
+        return str(row[0]) if row else default
+
+
+async def delete_news(news_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute("DELETE FROM news WHERE id=?", (news_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def update_news(news_id: int, title: str, body: str) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            "UPDATE news SET title=?, body=? WHERE id=?", (title, body, news_id)
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def delete_channel(channel_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute("DELETE FROM channels WHERE id=?", (channel_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def delete_lesson(lesson_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute("DELETE FROM lessons WHERE id=?", (lesson_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def delete_team_member(member_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute("DELETE FROM team_members WHERE id=?", (member_id,))
+        await db.commit()
+        return cursor.rowcount > 0
 
 
 async def add_news(title: str, body: str, admin_id: int) -> int:
