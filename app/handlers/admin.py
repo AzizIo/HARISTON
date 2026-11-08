@@ -348,7 +348,11 @@ async def channel_description(message: Message, state: FSMContext) -> None:
         await deny(message)
         return
     data = await state.get_data()
-    item_id = await add_channel(data["channel_title"], data["channel_url"], (message.text or "").strip())
+    description = (message.text or "").strip()
+    if len(description) > 200:
+        await message.answer("Описание канала не должно превышать 200 символов.")
+        return
+    item_id = await add_channel(data["channel_title"], data["channel_url"], description)
     await log_admin_action(message.from_user.id, f"added_channel:{item_id}")
     await state.clear()
     await message.answer("✅ Канал добавлен в раздел «Наши каналы».")
@@ -448,8 +452,8 @@ async def team_contact(message: Message, state: FSMContext) -> None:
     contact = (message.text or "").strip()
     if contact == "-":
         contact = ""
-    elif contact and not contact.startswith("https://"):
-        await message.answer("Ссылка должна начинаться с https:// или отправьте символ - .")
+    elif contact and (not contact.startswith("https://") or len(contact) > 300):
+        await message.answer("Укажите корректную HTTPS-ссылку длиной до 300 символов или отправьте - .")
         return
     await state.update_data(team_contact=contact)
     await state.set_state(AdminFlow.team_photo)
@@ -590,15 +594,15 @@ async def receive_site_setting(message: Message, state: FSMContext) -> None:
     if key == "contact_url":
         if value == "-":
             value = ""
-        elif not value.startswith("https://"):
-            await message.answer("Ссылка должна начинаться с https:// или отправьте - для очистки.")
+        elif not value.startswith("https://") or len(value) > 300:
+            await message.answer("Укажите HTTPS-ссылку длиной до 300 символов или отправьте - для очистки.")
             return
     elif key != "about":
         await state.clear()
         await message.answer("Неизвестная настройка. Откройте /admin.")
         return
-    if key == "about" and not value:
-        await message.answer("Описание проекта не должно быть пустым.")
+    if key == "about" and (not value or len(value) > 3000):
+        await message.answer("Описание проекта должно содержать от 1 до 3000 символов.")
         return
     await set_site_setting(key, value)
     await log_admin_action(message.from_user.id, f"updated_setting:{key}")
