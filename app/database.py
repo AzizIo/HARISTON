@@ -89,6 +89,57 @@ async def get_news(limit: int = 10):
         return await cursor.fetchall()
 
 
+async def add_channel(title: str, url: str, description: str) -> int:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            "INSERT INTO channels (title, url, description) VALUES (?, ?, ?)",
+            (title, url, description),
+        )
+        await db.commit()
+        return int(cursor.lastrowid)
+
+
+async def get_channels():
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM channels ORDER BY id DESC")
+        return await cursor.fetchall()
+
+
+async def add_lesson(title: str, body: str, category: str) -> int:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            "INSERT INTO lessons (title, body, category) VALUES (?, ?, ?)",
+            (title, body, category),
+        )
+        await db.commit()
+        return int(cursor.lastrowid)
+
+
+async def get_lessons():
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM lessons ORDER BY id DESC")
+        return await cursor.fetchall()
+
+
+async def add_team_member(name: str, role: str, description: str, contact_url: str) -> int:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            "INSERT INTO team_members (name, role, description, contact_url) VALUES (?, ?, ?, ?)",
+            (name, role, description, contact_url),
+        )
+        await db.commit()
+        return int(cursor.lastrowid)
+
+
+async def get_team():
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM team_members ORDER BY id DESC")
+        return await cursor.fetchall()
+
+
 async def get_user_ids(notifications_only: bool = False) -> list[int]:
     async with aiosqlite.connect(settings.database_path) as db:
         query = "SELECT telegram_id FROM users"
@@ -103,6 +154,20 @@ async def get_stats() -> tuple[int, int]:
         users = await (await db.execute("SELECT COUNT(*) FROM users")).fetchone()
         news = await (await db.execute("SELECT COUNT(*) FROM news WHERE is_published=1")).fetchone()
         return int(users[0]), int(news[0])
+
+
+async def toggle_notifications(telegram_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        row = await (await db.execute(
+            "SELECT notifications_enabled FROM users WHERE telegram_id=?", (telegram_id,)
+        )).fetchone()
+        enabled = not bool(row[0]) if row else True
+        await db.execute(
+            "UPDATE users SET notifications_enabled=? WHERE telegram_id=?",
+            (int(enabled), telegram_id),
+        )
+        await db.commit()
+        return enabled
 
 
 async def log_admin_action(admin_id: int, action: str) -> None:
