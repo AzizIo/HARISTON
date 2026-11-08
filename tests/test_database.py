@@ -93,3 +93,33 @@ async def test_media_items_are_persisted_and_deleted(initialized_db):
 async def test_media_type_is_validated(initialized_db):
     with pytest.raises(ValueError, match="Unsupported"):
         await initialized_db.add_media_item("Bad", "file", "audio", "", 1001)
+
+
+@pytest.mark.asyncio
+async def test_init_db_migrates_legacy_users_table(tmp_path, monkeypatch):
+    import aiosqlite
+    from dataclasses import replace
+    from app import database
+    from app.config import settings
+
+    path = tmp_path / "legacy.db"
+    async with aiosqlite.connect(path) as connection:
+        await connection.execute(
+            """CREATE TABLE users (
+                telegram_id INTEGER PRIMARY KEY,
+                username TEXT,
+                full_name TEXT NOT NULL,
+                joined_at TEXT NOT NULL,
+                notifications_enabled INTEGER NOT NULL DEFAULT 1
+            )"""
+        )
+        await connection.execute(
+            "INSERT INTO users VALUES (77, 'legacy', 'Legacy', '2026-01-01', 1)"
+        )
+        await connection.commit()
+
+    monkeypatch.setattr(database, "settings", replace(settings, database_path=str(path)))
+    await database.init_db()
+    code = await database.register_user(77, "legacy", "Legacy")
+    assert code
+    assert await database.get_referral_code(77) == code
