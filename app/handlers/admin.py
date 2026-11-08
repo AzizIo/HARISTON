@@ -291,7 +291,11 @@ async def channel_title(message: Message, state: FSMContext) -> None:
         await state.clear()
         await deny(message)
         return
-    await state.update_data(channel_title=(message.text or "").strip())
+    title = (message.text or "").strip()
+    if not title or len(title) > 120:
+        await message.answer("Название должно содержать от 1 до 120 символов.")
+        return
+    await state.update_data(channel_title=title)
     await state.set_state(AdminFlow.channel_url)
     await message.answer("Отправьте ссылку на канал (https://t.me/...).")
 
@@ -330,7 +334,11 @@ async def lesson_title(message: Message, state: FSMContext) -> None:
         await state.clear()
         await deny(message)
         return
-    await state.update_data(lesson_title=(message.text or "").strip())
+    title = (message.text or "").strip()
+    if not title or len(title) > 180:
+        await message.answer("Название должно содержать от 1 до 180 символов.")
+        return
+    await state.update_data(lesson_title=title)
     await state.set_state(AdminFlow.lesson_category)
     await message.answer("Укажите категорию материала (например: Начало игры, Экономика, Правила).")
 
@@ -365,7 +373,11 @@ async def team_name(message: Message, state: FSMContext) -> None:
         await state.clear()
         await deny(message)
         return
-    await state.update_data(team_name=(message.text or "").strip())
+    name = (message.text or "").strip()
+    if not name or len(name) > 100:
+        await message.answer("Имя должно содержать от 1 до 100 символов.")
+        return
+    await state.update_data(team_name=name)
     await state.set_state(AdminFlow.team_role)
     await message.answer("Укажите должность или роль в проекте.")
 
@@ -376,7 +388,11 @@ async def team_role(message: Message, state: FSMContext) -> None:
         await state.clear()
         await deny(message)
         return
-    await state.update_data(team_role=(message.text or "").strip())
+    role = (message.text or "").strip()
+    if not role or len(role) > 100:
+        await message.answer("Роль должна содержать от 1 до 100 символов.")
+        return
+    await state.update_data(team_role=role)
     await state.set_state(AdminFlow.team_description)
     await message.answer("Кратко опишите обязанности или информацию об участнике.")
 
@@ -387,7 +403,11 @@ async def team_description(message: Message, state: FSMContext) -> None:
         await state.clear()
         await deny(message)
         return
-    await state.update_data(team_description=(message.text or "").strip())
+    description = (message.text or "").strip()
+    if len(description) > 500:
+        await message.answer("Описание не должно превышать 500 символов.")
+        return
+    await state.update_data(team_description=description)
     await state.set_state(AdminFlow.team_contact)
     await message.answer("Отправьте ссылку для связи (например https://t.me/username) или символ - если ссылки нет.")
 
@@ -481,7 +501,7 @@ async def media_upload(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     media_id = await add_media_item(
         data["media_title"], file_id, media_type,
-        (message.caption or "").strip(), message.from_user.id,
+        (message.caption or "").strip()[:700], message.from_user.id,
     )
     await log_admin_action(message.from_user.id, f"added_media:{media_id}")
     recipients = await get_user_ids(notifications_only=True, category="media")
