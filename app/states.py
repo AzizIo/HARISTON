@@ -6,6 +6,8 @@ class AdminFlow(StatesGroup):
     news_body = State()
     broadcast_text = State()
     broadcast_confirm = State()
+    media_title = State()
+    media_upload = State()
     channel_title = State()
     channel_url = State()
     channel_description = State()
