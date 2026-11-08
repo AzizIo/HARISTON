@@ -46,3 +46,9 @@ async def test_broadcast_empty_recipient_list_is_valid():
 
     assert result.total == result.sent == result.blocked == result.failed == 0
     bot.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_broadcast_rejects_telegram_oversized_text():
+    with pytest.raises(ValueError, match="4096"):
+        await send_broadcast(AsyncMock(), [10], "x" * 4097)
