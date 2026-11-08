@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.config import settings
 from app.database import (
-    add_channel, add_lesson, add_news, add_team_member, get_news, get_stats,
+    add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news, get_stats,
     get_user_ids, log_admin_action, record_broadcast,
 )
 from app.keyboards import admin_flow_menu, admin_menu, broadcast_confirmation, broadcast_category_menu
@@ -118,6 +118,9 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
     elif action == "lesson_new":
         await state.set_state(AdminFlow.lesson_title)
         await callback.message.edit_text("🎓 <b>Новый обучающий материал</b>\n\nОтправьте название урока.", reply_markup=admin_flow_menu())
+    elif action == "media_new":
+        await state.set_state(AdminFlow.media_title)
+        await callback.message.edit_text("🎬 <b>HARISTON MEDIA</b>\\n\\nОтправьте название материала.", reply_markup=admin_flow_menu())
     elif action == "team_new":
         await state.set_state(AdminFlow.team_name)
         await callback.message.edit_text("👤 <b>Новый участник команды</b>\n\nОтправьте имя или псевдоним.", reply_markup=admin_flow_menu())
@@ -318,3 +321,45 @@ async def cancel_flow(message: Message, state: FSMContext) -> None:
         return
     await state.clear()
     await message.answer("Действие отменено. Откройте /admin для возврата в панель.")
+
+
+@router.message(AdminFlow.media_title)
+async def media_title(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    title = (message.text or "").strip()
+    if not title or len(title) > 180:
+        await message.answer("Название должно содержать от 1 до 180 символов.")
+        return
+    await state.update_data(media_title=title)
+    await state.set_state(AdminFlow.media_upload)
+    await message.answer("Отправьте фото, видео или документ. Подпись к файлу необязательна.")
+
+
+@router.message(AdminFlow.media_upload)
+async def media_upload(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    file_id = None
+    media_type = None
+    if message.photo:
+        file_id, media_type = message.photo[-1].file_id, "photo"
+    elif message.video:
+        file_id, media_type = message.video.file_id, "video"
+    elif message.document:
+        file_id, media_type = message.document.file_id, "document"
+    if not file_id or not media_type:
+        await message.answer("Нужен файл: фото, видео или документ.")
+        return
+    data = await state.get_data()
+    media_id = await add_media_item(
+        data["media_title"], file_id, media_type,
+        (message.caption or "").strip(), message.from_user.id,
+    )
+    await log_admin_action(message.from_user.id, f"added_media:{media_id}")
+    await state.clear()
+    await message.answer(f"✅ Материал HARISTON MEDIA #{media_id} добавлен.")
