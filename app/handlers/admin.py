@@ -10,7 +10,7 @@ from app.database import (
     add_channel, add_lesson, add_news, add_team_member, get_news, get_stats,
     get_user_ids, log_admin_action,
 )
-from app.keyboards import admin_menu, back_menu
+from app.keyboards import admin_flow_menu, admin_menu
 from app.states import AdminFlow
 
 router = Router(name="admin")
@@ -54,6 +54,11 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
     action = callback.data.split(":", 1)[1]
     if action == "home":
         return
+    if action == "cancel":
+        await state.clear()
+        await callback.message.edit_text("<b>⚙️ HARISTON · Панель управления</b>\\n\\nДействие отменено. Выберите следующий шаг:", reply_markup=admin_menu())
+        await callback.answer("Отменено")
+        return
     if action == "stats":
         users, news_count = await get_stats()
         await callback.message.edit_text(
@@ -68,7 +73,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         )
     elif action == "news_new":
         await state.set_state(AdminFlow.news_title)
-        await callback.message.edit_text("📰 <b>Новая публикация</b>\n\nОтправьте заголовок новости.", reply_markup=back_menu())
+        await callback.message.edit_text("📰 <b>Новая публикация</b>\n\nОтправьте заголовок новости.", reply_markup=admin_flow_menu())
     elif action == "news_list":
         items = await get_news(10)
         text = "<b>📰 Последние публикации</b>\n\n" + (
