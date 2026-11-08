@@ -97,7 +97,68 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_text("<b>⚙️ HARISTON · Панель управления</b>\n\nДействие отменено. Выберите следующий шаг:", reply_markup=admin_menu())
         await callback.answer("Отменено")
         return
-    if action == "stats":
+    if action == "manage_content":
+        await state.clear()
+        await callback.message.edit_text(
+            "🗂 <b>Управление контентом</b>\n\nВыберите раздел:",
+            reply_markup=content_type_menu(),
+        )
+    elif action.startswith("manage:"):
+        kind = action.split(":", 1)[1]
+        loaders = {
+            "channels": (get_channels, "Каналы"),
+            "lessons": (get_lessons, "Обучение"),
+            "team": (get_team, "Команда"),
+            "media": (get_media_items, "HARISTON MEDIA"),
+        }
+        if kind not in loaders:
+            await callback.answer("Неизвестный раздел", show_alert=True)
+            return
+        loader, title = loaders[kind]
+        items = await loader()
+        name_field = "name" if kind == "team" else "title"
+        lines = [f"#{item['id']} · {escape(str(item[name_field]))}" for item in items[:20]]
+        body = "\n".join(lines) if lines else "В этом разделе пока нет материалов."
+        await callback.message.edit_text(
+            f"<b>{title}</b>\n\n{body}\n\nВыберите элемент для удаления:",
+            reply_markup=content_items_menu(items, kind, name_field),
+        )
+    elif action.startswith("delete_content_confirm:"):
+        _, kind, raw_id = action.split(":")
+        delete_functions = {
+            "channels": delete_channel,
+            "lessons": delete_lesson,
+            "team": delete_team_member,
+            "media": delete_media_item,
+        }
+        if kind not in delete_functions:
+            await callback.answer("Неизвестный тип контента", show_alert=True)
+            return
+        deleted = await delete_functions[kind](int(raw_id))
+        await log_admin_action(callback.from_user.id, f"deleted_{kind}:{raw_id}")
+        await callback.message.edit_text(
+            "🗑 Материал удалён." if deleted else "Материал уже отсутствует.",
+            reply_markup=content_type_menu(),
+        )
+    elif action.startswith("delete_content:"):
+        _, kind, raw_id = action.split(":")
+        await callback.message.edit_text(
+            f"Подтвердите удаление элемента #{raw_id}. Это действие нельзя отменить.",
+            reply_markup=confirm_content_delete(kind, int(raw_id)),
+        )
+    elif action == "settings":
+        await state.clear()
+        await callback.message.edit_text(
+            "⚙️ <b>Настройки проекта</b>\n\nВыберите, что нужно изменить:",
+            reply_markup=site_settings_menu(),
+        )
+    elif action in {"setting_about", "setting_contact"}:
+        key = "about" if action == "setting_about" else "contact_url"
+        await state.update_data(site_setting_key=key)
+        await state.set_state(AdminFlow.setting_value)
+        prompt = "Отправьте описание проекта." if key == "about" else "Отправьте ссылку для связи (https://...) или - чтобы очистить."
+        await callback.message.edit_text(prompt, reply_markup=admin_flow_menu())
+    elif action == "stats":
         users, news_count = await get_stats()
         await callback.message.edit_text(
             f"<b>📊 Статистика HARISTON</b>\n\n👥 Пользователей: <b>{users}</b>\n📰 Опубликовано новостей: <b>{news_count}</b>",
