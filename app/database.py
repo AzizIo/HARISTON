@@ -16,7 +16,7 @@ async def init_db() -> None:
                 full_name TEXT NOT NULL,
                 joined_at TEXT NOT NULL,
                 notifications_enabled INTEGER NOT NULL DEFAULT 1,
-                referral_code TEXT UNIQUE,
+                referral_code TEXT,
                 referred_by INTEGER REFERENCES users(telegram_id)
             );
             CREATE TABLE IF NOT EXISTS news (
