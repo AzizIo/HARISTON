@@ -119,3 +119,22 @@ def broadcast_category_menu() -> InlineKeyboardMarkup:
     _button(kb, "Назад в панель", "admin:home", "back")
     kb.adjust(1, 1, 1, 1)
     return kb.as_markup()
+
+
+def news_management(items) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for item in items:
+        news_id = int(item["id"])
+        _button(kb, f"✏️ Редактировать #{news_id}", f"admin:news_edit:{news_id}", "create")
+        _button(kb, f"🗑 Удалить #{news_id}", f"admin:news_delete:{news_id}", "cancel", "danger")
+    _button(kb, "Назад в панель", "admin:home", "back")
+    kb.adjust(2, 2, 2, 2, 2, 1)
+    return kb.as_markup()
+
+
+def confirm_news_delete(news_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Да, удалить", f"admin:news_delete_confirm:{news_id}", "cancel", "danger")
+    _button(kb, "Отмена", "admin:news_list", "back")
+    kb.adjust(1, 1)
+    return kb.as_markup()
