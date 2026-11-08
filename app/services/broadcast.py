@@ -68,6 +68,8 @@ async def send_broadcast(
     """Send a message to a stable recipient snapshot with bounded concurrency."""
     if not text.strip():
         raise ValueError("Broadcast text must not be empty")
+    if len(text) > 4096:
+        raise ValueError("Broadcast text exceeds Telegram's 4096-character limit")
     if concurrency < 1:
         raise ValueError("Concurrency must be positive")
 
