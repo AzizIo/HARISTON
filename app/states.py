@@ -22,3 +22,7 @@ class AdminFlow(StatesGroup):
     team_description = State()
     team_contact = State()
     team_photo = State()
+
+    required_channel_title = State()
+    required_channel_chat_id = State()
+    required_channel_invite_url = State()
