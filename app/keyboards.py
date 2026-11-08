@@ -72,6 +72,7 @@ def admin_menu() -> InlineKeyboardMarkup:
         ("Добавить медиа", "admin:media_new", "broadcast", "primary"),
         ("Добавить сотрудника", "admin:team_new", "team", None),
         ("Рассылка", "admin:broadcast", "broadcast", "success"),
+        ("История рассылок", "admin:broadcast_history", "list", None),
         ("Пользователи", "admin:users", "users", None),
         ("Управление контентом", "admin:manage_content", "list", "primary"),
         ("Настройки проекта", "admin:settings", "settings", "primary"),
