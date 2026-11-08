@@ -4,6 +4,8 @@ from aiogram.fsm.state import State, StatesGroup
 class AdminFlow(StatesGroup):
     news_title = State()
     news_body = State()
+    news_edit_title = State()
+    news_edit_body = State()
     broadcast_text = State()
     broadcast_confirm = State()
     media_title = State()
