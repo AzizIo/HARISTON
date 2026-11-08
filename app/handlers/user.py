@@ -137,7 +137,7 @@ async def referral(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("menu:"))
+@router.callback_query(F.data.in_({"menu:about", "menu:contact"}))
 async def static_sections(callback: CallbackQuery) -> None:
     section = callback.data.split(":", 1)[1]
     pages = {
