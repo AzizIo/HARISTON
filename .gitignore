@@ -6,3 +6,11 @@ __pycache__/
 *.db
 *.sqlite3
 .DS_Store
+
+# Test and runtime artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+data/
+*.log
