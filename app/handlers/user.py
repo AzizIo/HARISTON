@@ -1,3 +1,4 @@
+from html import escape
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery, Message
@@ -58,7 +59,7 @@ async def channels(callback: CallbackQuery) -> None:
     items = await get_channels()
     if items:
         text = "<b>📢 Официальные каналы HARISTON</b>\n\n" + "\n\n".join(
-            f"<b>{item['title']}</b>\n{item['description']}\n<a href=\"{item['url']}\">Перейти к каналу</a>"
+            f"<b>{escape(item['title'])}</b>\n{escape(item['description'])}\n<a href=\"{escape(item['url'], quote=True)}\">Перейти к каналу</a>"
             for item in items
         )
     else:
@@ -72,7 +73,7 @@ async def education(callback: CallbackQuery) -> None:
     items = await get_lessons()
     if items:
         text = "<b>📚 Обучение HARISTON</b>\n\n" + "\n\n".join(
-            f"<b>{item['title']}</b> · <i>{item['category']}</i>\n{item['body'][:900]}"
+            f"<b>{escape(item['title'])}</b> · <i>{escape(item['category'])}</i>\n{escape(item['body'][:900])}"
             for item in items
         )
     else:
@@ -87,8 +88,8 @@ async def team(callback: CallbackQuery) -> None:
     if items:
         blocks = []
         for item in items:
-            contact = f"\n<a href=\"{item['contact_url']}\">Связаться</a>" if item["contact_url"] else ""
-            blocks.append(f"<b>{item['name']}</b>\n{item['role']}\n{item['description']}{contact}")
+            contact = f"\n<a href=\"{escape(item['contact_url'], quote=True)}\">Связаться</a>" if item["contact_url"] else ""
+            blocks.append(f"<b>{escape(item['name'])}</b>\n{escape(item['role'])}\n{escape(item['description'])}{contact}")
         text = "<b>👥 Команда HARISTON</b>\n\n" + "\n\n".join(blocks)
     else:
         text = "<b>👥 Команда HARISTON</b>\n\nКарточки команды скоро появятся."
@@ -164,9 +165,9 @@ async def media(callback: CallbackQuery) -> None:
         reply_markup=back_menu(),
     )
     for item in reversed(items):
-        caption = f"<b>{item['title']}</b>"
+        caption = f"<b>{escape(item['title'])}</b>"
         if item["caption"]:
-            caption += f"\n{item['caption']}"
+            caption += f"\n{escape(item['caption'])}"
         if item["media_type"] == "photo":
             await callback.message.answer_photo(item["file_id"], caption=caption)
         elif item["media_type"] == "video":
