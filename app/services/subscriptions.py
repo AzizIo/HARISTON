@@ -70,7 +70,7 @@ class RequiredSubscriptionMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         message = (
-            "🔐 <b>Доступ к HARISTON</b>\\n\\n"
+            "🔐 <b>Доступ к HARISTON</b>\n\n"
             "Чтобы пользоваться ботом, подпишитесь на все каналы ниже, "
             "а затем нажмите «Проверить подписку»."
         )
