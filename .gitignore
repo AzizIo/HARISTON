@@ -16,3 +16,9 @@ data/
 *.log
 
 backups/
+
+# SQLite sidecar files
+*.db-wal
+*.db-shm
+*.sqlite3-wal
+*.sqlite3-shm
