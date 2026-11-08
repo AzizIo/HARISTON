@@ -419,3 +419,24 @@ async def delete_media_item(media_id: int) -> bool:
         cursor = await db.execute("DELETE FROM media_items WHERE id=?", (media_id,))
         await db.commit()
         return cursor.rowcount > 0
+
+
+async def get_dashboard_stats() -> dict[str, int]:
+    tables = {
+        "users": "users",
+        "news": "news WHERE is_published=1",
+        "channels": "channels",
+        "lessons": "lessons",
+        "team": "team_members",
+        "media": "media_items",
+    }
+    async with aiosqlite.connect(settings.database_path) as db:
+        result = {}
+        for key, table in tables.items():
+            row = await (await db.execute(f"SELECT COUNT(*) FROM {table}")).fetchone()
+            result[key] = int(row[0])
+        referrals = await (await db.execute(
+            "SELECT COUNT(*) FROM users WHERE referred_by IS NOT NULL"
+        )).fetchone()
+        result["referrals"] = int(referrals[0])
+        return result
