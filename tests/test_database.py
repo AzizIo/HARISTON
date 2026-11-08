@@ -139,7 +139,17 @@ async def test_other_content_types_can_be_deleted(initialized_db):
     db = initialized_db
     channel_id = await db.add_channel("Official", "https://t.me/example", "")
     lesson_id = await db.add_lesson("Guide", "Body", "Basics")
-    member_id = await db.add_team_member("Alex", "Developer", "", "")
+    member_id = await db.add_team_member("Alex", "Developer", "", "", "team-photo-file")
     assert await db.delete_channel(channel_id)
     assert await db.delete_lesson(lesson_id)
     assert await db.delete_team_member(member_id)
+
+
+@pytest.mark.asyncio
+async def test_team_photo_is_optional_and_persisted(initialized_db):
+    db = initialized_db
+    await db.add_team_member("No Photo", "Tester", "", "")
+    await db.add_team_member("With Photo", "Artist", "", "", "photo-file-id")
+    members = await db.get_team()
+    assert members[0]["photo_file_id"] == "photo-file-id"
+    assert members[1]["photo_file_id"] is None
