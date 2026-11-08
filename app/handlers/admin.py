@@ -56,7 +56,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         return
     if action == "cancel":
         await state.clear()
-        await callback.message.edit_text("<b>⚙️ HARISTON · Панель управления</b>\\n\\nДействие отменено. Выберите следующий шаг:", reply_markup=admin_menu())
+        await callback.message.edit_text("<b>⚙️ HARISTON · Панель управления</b>\n\nДействие отменено. Выберите следующий шаг:", reply_markup=admin_menu())
         await callback.answer("Отменено")
         return
     if action == "stats":
@@ -232,7 +232,7 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
     status = await message.answer(f"📣 Начинаю рассылку для {len(user_ids)} пользователей…")
     for user_id in user_ids:
         try:
-            await message.bot.send_message(user_id, text)
+            await message.bot.send_message(user_id, text, parse_mode=None)
             sent += 1
         except Exception as exc:
             failed += 1
