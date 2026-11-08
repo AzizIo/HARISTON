@@ -41,3 +41,9 @@ def admin_menu() -> InlineKeyboardMarkup:
         kb.button(text=text, callback_data=data)
     kb.adjust(2, 2, 2, 2, 1)
     return kb.as_markup()
+
+
+def admin_flow_menu() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✖️ Отменить действие", callback_data="admin:cancel")
+    return kb.as_markup()
