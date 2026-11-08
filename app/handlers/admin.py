@@ -1,4 +1,3 @@
-import logging
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -14,8 +13,6 @@ from app.services.broadcast import send_broadcast
 from app.states import AdminFlow
 
 router = Router(name="admin")
-logger = logging.getLogger(__name__)
-
 
 def is_admin(user_id: int) -> bool:
     return user_id in settings.admin_ids
@@ -167,6 +164,10 @@ async def receive_news_body(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.channel_title)
 async def channel_title(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     await state.update_data(channel_title=(message.text or "").strip())
     await state.set_state(AdminFlow.channel_url)
     await message.answer("Отправьте ссылку на канал (https://t.me/...).")
@@ -174,6 +175,10 @@ async def channel_title(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.channel_url)
 async def channel_url(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     url = (message.text or "").strip()
     if not url.startswith(("https://t.me/", "https://")):
         await message.answer("Нужна корректная ссылка, начинающаяся с https://")
@@ -185,6 +190,10 @@ async def channel_url(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.channel_description)
 async def channel_description(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     data = await state.get_data()
     item_id = await add_channel(data["channel_title"], data["channel_url"], (message.text or "").strip())
     await log_admin_action(message.from_user.id, f"added_channel:{item_id}")
@@ -194,6 +203,10 @@ async def channel_description(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.lesson_title)
 async def lesson_title(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     await state.update_data(lesson_title=(message.text or "").strip())
     await state.set_state(AdminFlow.lesson_category)
     await message.answer("Укажите категорию материала (например: Начало игры, Экономика, Правила).")
@@ -201,6 +214,10 @@ async def lesson_title(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.lesson_category)
 async def lesson_category(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     await state.update_data(lesson_category=(message.text or "Общее").strip())
     await state.set_state(AdminFlow.lesson_body)
     await message.answer("Отправьте текст обучающего материала.")
@@ -208,6 +225,10 @@ async def lesson_category(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.lesson_body)
 async def lesson_body(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     data = await state.get_data()
     item_id = await add_lesson(data["lesson_title"], (message.text or "").strip(), data["lesson_category"])
     await log_admin_action(message.from_user.id, f"added_lesson:{item_id}")
@@ -217,6 +238,10 @@ async def lesson_body(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.team_name)
 async def team_name(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     await state.update_data(team_name=(message.text or "").strip())
     await state.set_state(AdminFlow.team_role)
     await message.answer("Укажите должность или роль в проекте.")
@@ -224,6 +249,10 @@ async def team_name(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.team_role)
 async def team_role(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     await state.update_data(team_role=(message.text or "").strip())
     await state.set_state(AdminFlow.team_description)
     await message.answer("Кратко опишите обязанности или информацию об участнике.")
@@ -231,6 +260,10 @@ async def team_role(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.team_description)
 async def team_description(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     await state.update_data(team_description=(message.text or "").strip())
     await state.set_state(AdminFlow.team_contact)
     await message.answer("Отправьте ссылку для связи (например https://t.me/username) или символ - если ссылки нет.")
@@ -238,6 +271,10 @@ async def team_description(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminFlow.team_contact)
 async def team_contact(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
     data = await state.get_data()
     contact = (message.text or "").strip()
     if contact == "-":
