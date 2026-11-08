@@ -52,3 +52,9 @@ async def test_broadcast_empty_recipient_list_is_valid():
 async def test_broadcast_rejects_telegram_oversized_text():
     with pytest.raises(ValueError, match="4096"):
         await send_broadcast(AsyncMock(), [10], "x" * 4097)
+
+
+@pytest.mark.asyncio
+async def test_broadcast_rejects_negative_rate_interval():
+    with pytest.raises(ValueError, match="interval"):
+        await send_broadcast(AsyncMock(), [10], "Hello", min_interval=-0.1)
