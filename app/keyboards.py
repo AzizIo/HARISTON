@@ -82,3 +82,11 @@ def admin_flow_menu() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     _button(kb, "Отменить действие", "admin:cancel", "cancel", "danger")
     return kb.as_markup()
+
+
+def broadcast_confirmation() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Подтвердить рассылку", "admin:broadcast_send", "create", "success")
+    _button(kb, "Отменить", "admin:broadcast_cancel", "cancel", "danger")
+    kb.adjust(1, 1)
+    return kb.as_markup()
