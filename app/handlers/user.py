@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import (
     get_channels, get_lessons, get_news, get_team, get_media_items, register_user,
     get_notification_preferences, set_notification_preference,
-    get_referral_stats,
+    get_referral_stats, get_site_setting,
 )
 from app.keyboards import back_menu, main_menu, notification_menu
 
@@ -141,11 +141,20 @@ async def referral(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.in_({"menu:about", "menu:contact"}))
 async def static_sections(callback: CallbackQuery) -> None:
     section = callback.data.split(":", 1)[1]
+    about_text = await get_site_setting("about", "")
+    contact_url = await get_site_setting("contact_url", "")
     pages = {
-        "about": "<b>🌍 О проекте HARISTON</b>\n\nИнформация о концепции, мире и планах проекта скоро появится здесь.",
-        "contact": "<b>💬 Связаться с командой</b>\n\nКонтакты администрации будут опубликованы здесь.",
+        "about": "<b>🌍 О проекте HARISTON</b>\n\n" + (escape(about_text) if about_text else "Информация о проекте скоро появится."),
+        "contact": "<b>💬 Связаться с командой</b>\n\n" + (
+            '<a href="' + escape(contact_url, quote=True) + '">Написать команде</a>'
+            if contact_url else "Контакты администрации скоро появятся."
+        ),
     }
-    await callback.message.edit_text(pages.get(section, "Раздел не найден."), reply_markup=back_menu())
+    await callback.message.edit_text(
+        pages.get(section, "Раздел не найден."),
+        reply_markup=back_menu(),
+        disable_web_page_preview=True,
+    )
     await callback.answer()
 
 
