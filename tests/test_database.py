@@ -28,7 +28,8 @@ async def test_invalid_and_self_referrals_are_ignored(initialized_db):
     db = initialized_db
     own_code = await db.register_user(101, "user", "User", "unknown")
     await db.register_user(202, "other", "Other", own_code)
-    await db.register_user(303, "self", "Self", own_code)
+    self_code = await db.register_user(303, "self", "Self")
+    await db.register_user(303, "self", "Self", self_code)
 
     assert await db.get_referral_stats(101) == 1
     assert await db.get_referral_stats(303) == 0
