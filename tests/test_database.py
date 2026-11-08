@@ -165,3 +165,25 @@ async def test_team_photo_is_optional_and_persisted(initialized_db):
     members = await db.get_team()
     assert members[0]["photo_file_id"] == "photo-file-id"
     assert members[1]["photo_file_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_dashboard_stats_include_all_project_sections(initialized_db):
+    db = initialized_db
+    await db.register_user(101, "user", "User")
+    await db.add_news("News", "Body", 1001)
+    await db.add_channel("Channel", "https://t.me/example", "")
+    await db.add_lesson("Lesson", "Body", "Basics")
+    await db.add_team_member("Member", "Role", "", "")
+    await db.add_media_item("Clip", "file-id", "video", "", 1001)
+
+    stats = await db.get_dashboard_stats()
+    assert stats == {
+        "users": 1,
+        "news": 1,
+        "channels": 1,
+        "lessons": 1,
+        "team": 1,
+        "media": 1,
+        "referrals": 0,
+    }
