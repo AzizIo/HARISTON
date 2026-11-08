@@ -120,14 +120,25 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_text("🎓 <b>Новый обучающий материал</b>\n\nОтправьте название урока.", reply_markup=admin_flow_menu())
     elif action == "media_new":
         await state.set_state(AdminFlow.media_title)
-        await callback.message.edit_text("🎬 <b>HARISTON MEDIA</b>\\n\\nОтправьте название материала.", reply_markup=admin_flow_menu())
+        await callback.message.edit_text("🎬 <b>HARISTON MEDIA</b>\n\nОтправьте название материала.", reply_markup=admin_flow_menu())
     elif action == "team_new":
         await state.set_state(AdminFlow.team_name)
         await callback.message.edit_text("👤 <b>Новый участник команды</b>\n\nОтправьте имя или псевдоним.", reply_markup=admin_flow_menu())
     elif action == "broadcast":
+        await state.clear()
+        await callback.message.edit_text(
+            "📣 <b>Новая рассылка</b>\n\nВыберите категорию получателей:",
+            reply_markup=broadcast_category_menu(),
+        )
+    elif action.startswith("broadcast_category_"):
+        category = action.removeprefix("broadcast_category_")
+        if category not in {"news", "announcements", "media"}:
+            await callback.answer("Неизвестная категория", show_alert=True)
+            return
+        await state.update_data(broadcast_category=category)
         await state.set_state(AdminFlow.broadcast_text)
         await callback.message.edit_text(
-            "📣 <b>Рассылка</b>\n\nОтправьте текст сообщения. Оно будет разослано пользователям, включившим уведомления.",
+            f"📣 <b>Рассылка · {category}</b>\n\nОтправьте текст сообщения. Перед отправкой будет показан предпросмотр.",
             reply_markup=admin_flow_menu(),
         )
     await callback.answer()
@@ -308,6 +319,7 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
     await message.answer(
         "<b>Предпросмотр рассылки</b>\n\n"
         f"{text[:3000]}\n\n"
+        f"Категория: <b>{category}</b>\n"
         f"Категория: <b>{category}</b>\n"
         f"Получателей с включёнными уведомлениями: <b>{len(recipients)}</b>\n\n"
         "Отправить сообщение всем выбранным пользователям?",
