@@ -8,6 +8,7 @@ from app.config import settings
 from app.database import (
     add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news, get_stats,
     get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
+    set_site_setting,
 )
 from app.keyboards import (
     admin_flow_menu, admin_menu, broadcast_confirmation,
@@ -444,3 +445,31 @@ async def receive_news_edit_body(message: Message, state: FSMContext) -> None:
         await log_admin_action(message.from_user.id, f"updated_news:{data['edit_news_id']}")
     await state.clear()
     await message.answer("✅ Публикация обновлена." if updated else "Публикация не найдена.")
+
+
+@router.message(AdminFlow.setting_value)
+async def receive_site_setting(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    value = (message.text or "").strip()
+    data = await state.get_data()
+    key = data.get("site_setting_key")
+    if key == "contact_url":
+        if value == "-":
+            value = ""
+        elif not value.startswith("https://"):
+            await message.answer("Ссылка должна начинаться с https:// или отправьте - для очистки.")
+            return
+    elif key != "about":
+        await state.clear()
+        await message.answer("Неизвестная настройка. Откройте /admin.")
+        return
+    if key == "about" and not value:
+        await message.answer("Описание проекта не должно быть пустым.")
+        return
+    await set_site_setting(key, value)
+    await log_admin_action(message.from_user.id, f"updated_setting:{key}")
+    await state.clear()
+    await message.answer("✅ Настройка проекта сохранена.")
