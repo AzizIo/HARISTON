@@ -377,3 +377,36 @@ async def log_admin_action(admin_id: int, action: str) -> None:
             (admin_id, action, now),
         )
         await db.commit()
+
+
+async def add_media_item(
+    title: str, file_id: str, media_type: str, caption: str, admin_id: int
+) -> int:
+    if media_type not in {"photo", "video", "document"}:
+        raise ValueError("Unsupported media type")
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            """INSERT INTO media_items
+               (title, file_id, media_type, caption, created_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (title, file_id, media_type, caption, now, admin_id),
+        )
+        await db.commit()
+        return int(cursor.lastrowid)
+
+
+async def get_media_items(limit: int = 10):
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM media_items ORDER BY id DESC LIMIT ?", (limit,)
+        )
+        return await cursor.fetchall()
+
+
+async def delete_media_item(media_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute("DELETE FROM media_items WHERE id=?", (media_id,))
+        await db.commit()
+        return cursor.rowcount > 0
