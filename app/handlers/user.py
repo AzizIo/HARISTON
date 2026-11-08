@@ -184,4 +184,4 @@ async def media(callback: CallbackQuery) -> None:
             await callback.message.answer_video(item["file_id"], caption=caption)
         else:
             await callback.message.answer_document(item["file_id"], caption=caption)
-    await callback.answer()
+
