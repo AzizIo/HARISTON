@@ -73,6 +73,7 @@ def admin_menu() -> InlineKeyboardMarkup:
         ("Добавить сотрудника", "admin:team_new", "team", None),
         ("Рассылка", "admin:broadcast", "broadcast", "success"),
         ("Пользователи", "admin:users", "users", None),
+        ("Управление контентом", "admin:manage_content", "list", "primary"),
         ("Настройки проекта", "admin:settings", "settings", "primary"),
         ("Главное меню", "menu:home", "back", None),
     ]
@@ -147,4 +148,34 @@ def site_settings_menu() -> InlineKeyboardMarkup:
     _button(kb, "Контактная ссылка", "admin:setting_contact", "contact", "success")
     _button(kb, "Назад в панель", "admin:home", "back")
     kb.adjust(1, 1, 1)
+    return kb.as_markup()
+
+
+def content_type_menu() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Официальные каналы", "admin:manage:channels", "channels", "primary")
+    _button(kb, "Обучающие материалы", "admin:manage:lessons", "education", "primary")
+    _button(kb, "Команда", "admin:manage:team", "team")
+    _button(kb, "HARISTON MEDIA", "admin:manage:media", "broadcast", "primary")
+    _button(kb, "Назад в панель", "admin:home", "back")
+    kb.adjust(1, 1, 1, 1, 1)
+    return kb.as_markup()
+
+
+def content_items_menu(items, kind: str, name_field: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for item in items[:20]:
+        item_id = int(item["id"])
+        label = str(item[name_field])[:24]
+        _button(kb, f"Удалить: {label}", f"admin:delete_content:{kind}:{item_id}", "cancel", "danger")
+    _button(kb, "К разделам", "admin:manage_content", "back")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def confirm_content_delete(kind: str, item_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Да, удалить", f"admin:delete_content_confirm:{kind}:{item_id}", "cancel", "danger")
+    _button(kb, "Отмена", f"admin:manage:{kind}", "back")
+    kb.adjust(1, 1)
     return kb.as_markup()
