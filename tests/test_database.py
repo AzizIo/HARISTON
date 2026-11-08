@@ -116,6 +116,15 @@ async def test_init_db_migrates_legacy_users_table(tmp_path, monkeypatch):
         await connection.execute(
             "INSERT INTO users VALUES (77, 'legacy', 'Legacy', '2026-01-01', 1)"
         )
+        await connection.execute(
+            """CREATE TABLE team_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                role TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                contact_url TEXT NOT NULL DEFAULT ''
+            )"""
+        )
         await connection.commit()
 
     monkeypatch.setattr(database, "settings", replace(settings, database_path=str(path)))
@@ -123,6 +132,9 @@ async def test_init_db_migrates_legacy_users_table(tmp_path, monkeypatch):
     code = await database.register_user(77, "legacy", "Legacy")
     assert code
     assert await database.get_referral_code(77) == code
+    async with aiosqlite.connect(path) as connection:
+        team_columns = {row[1] for row in await (await connection.execute("PRAGMA table_info(team_members)")).fetchall()}
+    assert "photo_file_id" in team_columns
 
 
 @pytest.mark.asyncio
