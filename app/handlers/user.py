@@ -48,7 +48,7 @@ async def news(callback: CallbackQuery) -> None:
     else:
         parts = ["<b>📰 Новости HARISTON</b>"]
         for item in items:
-            parts.append(f"\n<b>#{item['id']} · {item['title']}</b>\n{item['body'][:700]}")
+            parts.append(f"\n<b>#{item['id']} · {escape(item['title'])}</b>\n{escape(item['body'][:700])}")
         text = "\n".join(parts)
     await callback.message.edit_text(text, reply_markup=back_menu())
     await callback.answer()
