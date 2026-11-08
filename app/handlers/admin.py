@@ -68,6 +68,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         status = await callback.message.edit_text(
             f"📣 <b>Рассылка запущена</b>\n\nПолучателей: {len(recipients)}. Это может занять некоторое время."
         )
+        await callback.answer("Рассылка запущена")
         result = await send_broadcast(callback.bot, recipients, draft)
         await record_broadcast(callback.from_user.id, result.total, result.sent, result.blocked, result.failed)
         await log_admin_action(
@@ -82,7 +83,6 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
             f"⚠️ Ошибки: {result.failed}",
             reply_markup=admin_menu(),
         )
-        await callback.answer("Рассылка завершена")
         return
     if action == "broadcast_cancel":
         await state.clear()
@@ -324,6 +324,9 @@ async def team_contact(message: Message, state: FSMContext) -> None:
     contact = (message.text or "").strip()
     if contact == "-":
         contact = ""
+    elif contact and not contact.startswith("https://"):
+        await message.answer("Ссылка должна начинаться с https:// или отправьте символ - .")
+        return
     item_id = await add_team_member(
         data["team_name"], data["team_role"], data["team_description"], contact
     )
@@ -341,6 +344,9 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
     text = (message.text or message.caption or "").strip()
     if not text:
         await message.answer("Сообщение не должно быть пустым. Попробуйте ещё раз.")
+        return
+    if len(text) > 4096:
+        await message.answer("Сообщение превышает лимит Telegram в 4096 символов. Сократите текст.")
         return
     await state.update_data(broadcast_text=text)
     data = await state.get_data()
