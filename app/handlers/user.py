@@ -4,9 +4,11 @@ from aiogram.types import CallbackQuery, Message
 
 from app.config import settings
 from app.database import (
-    get_channels, get_lessons, get_news, get_team, register_user, toggle_notifications,
+    get_channels, get_lessons, get_news, get_team, register_user,
+    get_notification_preferences, set_notification_preference,
+    get_referral_stats,
 )
-from app.keyboards import back_menu, main_menu
+from app.keyboards import back_menu, main_menu, notification_menu
 
 router = Router(name="user")
 
@@ -21,7 +23,10 @@ WELCOME = (
 @router.message(CommandStart())
 async def start(message: Message) -> None:
     user = message.from_user
-    await register_user(user.id, user.username, user.full_name)
+    parts = (message.text or "").split(maxsplit=1)
+    payload = parts[1].strip() if len(parts) > 1 else ""
+    invite_code = payload.removeprefix("ref_") if payload.startswith("ref_") else None
+    await register_user(user.id, user.username, user.full_name, invite_code)
     await message.answer(WELCOME, reply_markup=main_menu(user.id in settings.admin_ids))
 
 
@@ -93,10 +98,40 @@ async def team(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:notifications")
 async def notifications(callback: CallbackQuery) -> None:
-    enabled = await toggle_notifications(callback.from_user.id)
-    state = "включены" if enabled else "отключены"
+    preferences = await get_notification_preferences(callback.from_user.id)
     await callback.message.edit_text(
-        f"<b>🔔 Уведомления {state}</b>\n\nНастройка влияет на будущие информационные рассылки.",
+        "<b>🔔 Настройки уведомлений</b>\n\nВыберите, какие сообщения HARISTON вы хотите получать:",
+        reply_markup=notification_menu(preferences),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("prefs:"))
+async def toggle_notification_category(callback: CallbackQuery) -> None:
+    category = callback.data.split(":", 1)[1]
+    preferences = await get_notification_preferences(callback.from_user.id)
+    if category not in preferences:
+        await callback.answer("Неизвестная категория", show_alert=True)
+        return
+    enabled = not preferences[category]
+    await set_notification_preference(callback.from_user.id, category, enabled)
+    preferences[category] = enabled
+    await callback.message.edit_reply_markup(reply_markup=notification_menu(preferences))
+    await callback.answer("Настройка обновлена")
+
+
+@router.callback_query(F.data == "menu:referral")
+async def referral(callback: CallbackQuery) -> None:
+    code = await register_user(
+        callback.from_user.id, callback.from_user.username, callback.from_user.full_name
+    )
+    referrals = await get_referral_stats(callback.from_user.id)
+    bot_user = await callback.bot.get_me()
+    link = f"https://t.me/{bot_user.username}?start=ref_{code}"
+    await callback.message.edit_text(
+        "<b>🤝 Приглашай друзей в HARISTON</b>\n\n"
+        f"Твоя персональная ссылка:\n<code>{link}</code>\n\n"
+        f"Приглашено пользователей: <b>{referrals}</b>",
         reply_markup=back_menu(),
     )
     await callback.answer()
