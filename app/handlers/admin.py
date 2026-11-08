@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.config import settings
 from app.database import (
-    add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news, get_stats,
+    add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news,
     get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
     set_site_setting, get_channels, get_lessons, get_team, get_media_items,
     delete_channel, delete_lesson, delete_team_member, delete_media_item,
@@ -160,9 +160,34 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         prompt = "Отправьте описание проекта." if key == "about" else "Отправьте ссылку для связи (https://...) или - чтобы очистить."
         await callback.message.edit_text(prompt, reply_markup=admin_flow_menu())
     elif action == "stats":
-        users, news_count = await get_stats()
+        stats = await get_dashboard_stats()
         await callback.message.edit_text(
-            f"<b>📊 Статистика HARISTON</b>\n\n👥 Пользователей: <b>{users}</b>\n📰 Опубликовано новостей: <b>{news_count}</b>",
+            "<b>📊 Статистика HARISTON</b>\n\n"
+            f"👥 Пользователи: <b>{stats['users']}</b>\n"
+            f"📰 Новости: <b>{stats['news']}</b>\n"
+            f"📢 Каналы: <b>{stats['channels']}</b>\n"
+            f"📚 Материалы: <b>{stats['lessons']}</b>\n"
+            f"👤 Участники команды: <b>{stats['team']}</b>\n"
+            f"🎬 Медиа: <b>{stats['media']}</b>\n"
+            f"🤝 Приглашения: <b>{stats['referrals']}</b>",
+            reply_markup=admin_menu(),
+        )
+    elif action == "broadcast_history":
+        history = await get_broadcast_history(10)
+        if history:
+            lines = []
+            for item in history:
+                created = str(item["created_at"]).replace("T", " ")[:16]
+                lines.append(
+                    f"#{item['id']} · {created}\n"
+                    f"Доставлено: {item['sent']}/{item['total']} · "
+                    f"Недоступны: {item['blocked']} · Ошибки: {item['failed']}"
+                )
+            body = "\n\n".join(lines)
+        else:
+            body = "Рассылок пока не было."
+        await callback.message.edit_text(
+            "<b>🧾 История рассылок</b>\n\n" + body,
             reply_markup=admin_menu(),
         )
     elif action == "users":
