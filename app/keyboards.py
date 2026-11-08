@@ -43,6 +43,7 @@ def main_menu(is_admin: bool = False) -> InlineKeyboardMarkup:
         ("Команда", "menu:team", "team", None),
         ("Связаться", "menu:contact", "contact", "success"),
         ("Уведомления", "menu:notifications", "notifications", None),
+        ("Пригласить друга", "menu:referral", "contact", None),
     ]
     for text, callback, emoji, style in items:
         _button(kb, text, callback, emoji, style)
@@ -89,4 +90,30 @@ def broadcast_confirmation() -> InlineKeyboardMarkup:
     _button(kb, "Подтвердить рассылку", "admin:broadcast_send", "create", "success")
     _button(kb, "Отменить", "admin:broadcast_cancel", "cancel", "danger")
     kb.adjust(1, 1)
+    return kb.as_markup()
+
+
+def notification_menu(preferences: dict[str, bool]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    labels = {
+        "news": "Новости",
+        "announcements": "Анонсы",
+        "media": "HARISTON MEDIA",
+    }
+    for category, label in labels.items():
+        state = "Вкл." if preferences.get(category, True) else "Выкл."
+        _button(kb, f"{label}: {state}", f"prefs:{category}", "notifications",
+                "success" if preferences.get(category, True) else "danger")
+    _button(kb, "Главное меню", "menu:home", "back")
+    kb.adjust(1, 1, 1, 1)
+    return kb.as_markup()
+
+
+def broadcast_category_menu() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    _button(kb, "Новости", "admin:broadcast_category_news", "news", "primary")
+    _button(kb, "Анонсы", "admin:broadcast_category_announcements", "info", "success")
+    _button(kb, "HARISTON MEDIA", "admin:broadcast_category_media", "education", "primary")
+    _button(kb, "Назад в панель", "admin:home", "back")
+    kb.adjust(1, 1, 1, 1)
     return kb.as_markup()
