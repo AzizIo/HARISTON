@@ -9,7 +9,10 @@ from app.database import (
     add_channel, add_lesson, add_news, add_team_member, add_media_item, get_news, get_stats,
     get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
 )
-from app.keyboards import admin_flow_menu, admin_menu, broadcast_confirmation, broadcast_category_menu
+from app.keyboards import (
+    admin_flow_menu, admin_menu, broadcast_confirmation,
+    broadcast_category_menu, news_management, confirm_news_delete,
+)
 from app.services.broadcast import send_broadcast
 from app.states import AdminFlow
 
@@ -347,7 +350,6 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
     await message.answer(
         "<b>Предпросмотр рассылки</b>\n\n"
         f"{escape(text[:3000])}\n\n"
-        f"Категория: <b>{category}</b>\n"
         f"Категория: <b>{category}</b>\n"
         f"Получателей с включёнными уведомлениями: <b>{len(recipients)}</b>\n\n"
         "Отправить сообщение всем выбранным пользователям?",
