@@ -42,13 +42,13 @@ async def home(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:news")
 async def news(callback: CallbackQuery) -> None:
-    items = await get_news(10)
+    items = await get_news(5)
     if not items:
         text = "<b>📰 Новости HARISTON</b>\n\nПока публикаций нет. Заглядывай позже!"
     else:
         parts = ["<b>📰 Новости HARISTON</b>"]
         for item in items:
-            parts.append(f"\n<b>#{item['id']} · {escape(item['title'])}</b>\n{escape(item['body'][:700])}")
+            parts.append(f"\n<b>#{item['id']} · {escape(item['title'])}</b>\n{escape(item['body'][:500])}")
         text = "\n".join(parts)
     await callback.message.edit_text(text, reply_markup=back_menu())
     await callback.answer()
@@ -56,10 +56,10 @@ async def news(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:channels")
 async def channels(callback: CallbackQuery) -> None:
-    items = await get_channels()
+    items = (await get_channels())[:10]
     if items:
         text = "<b>📢 Официальные каналы HARISTON</b>\n\n" + "\n\n".join(
-            f"<b>{escape(item['title'])}</b>\n{escape(item['description'])}\n<a href=\"{escape(item['url'], quote=True)}\">Перейти к каналу</a>"
+            f"<b>{escape(item['title'])}</b>\n{escape(item['description'][:200])}\n<a href=\"{escape(item['url'], quote=True)}\">Перейти к каналу</a>"
             for item in items
         )
     else:
@@ -70,10 +70,10 @@ async def channels(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:education")
 async def education(callback: CallbackQuery) -> None:
-    items = await get_lessons()
+    items = (await get_lessons())[:5]
     if items:
         text = "<b>📚 Обучение HARISTON</b>\n\n" + "\n\n".join(
-            f"<b>{escape(item['title'])}</b> · <i>{escape(item['category'])}</i>\n{escape(item['body'][:900])}"
+            f"<b>{escape(item['title'])}</b> · <i>{escape(item['category'])}</i>\n{escape(item['body'][:500])}"
             for item in items
         )
     else:
@@ -84,12 +84,12 @@ async def education(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "menu:team")
 async def team(callback: CallbackQuery) -> None:
-    items = await get_team()
+    items = (await get_team())[:10]
     if items:
         blocks = []
         for item in items:
             contact = f"\n<a href=\"{escape(item['contact_url'], quote=True)}\">Связаться</a>" if item["contact_url"] else ""
-            blocks.append(f"<b>{escape(item['name'])}</b>\n{escape(item['role'])}\n{escape(item['description'])}{contact}")
+            blocks.append(f"<b>{escape(item['name'])}</b>\n{escape(item['role'])}\n{escape(item['description'][:200])}{contact}")
         text = "<b>👥 Команда HARISTON</b>\n\n" + "\n\n".join(blocks)
     else:
         text = "<b>👥 Команда HARISTON</b>\n\nКарточки команды скоро появятся."
@@ -173,10 +173,11 @@ async def media(callback: CallbackQuery) -> None:
         "<b>🎬 HARISTON MEDIA</b>\n\nПоследние материалы отправлены ниже.",
         reply_markup=back_menu(),
     )
+    await callback.answer()
     for item in reversed(items):
         caption = f"<b>{escape(item['title'])}</b>"
         if item["caption"]:
-            caption += f"\n{escape(item['caption'])}"
+            caption += f"\n{escape(item['caption'][:700])}"
         if item["media_type"] == "photo":
             await callback.message.answer_photo(item["file_id"], caption=caption)
         elif item["media_type"] == "video":
