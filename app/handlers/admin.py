@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from aiogram import F, Router
@@ -10,7 +9,8 @@ from app.database import (
     add_channel, add_lesson, add_news, add_team_member, get_news, get_stats,
     get_user_ids, log_admin_action,
 )
-from app.keyboards import admin_flow_menu, admin_menu
+from app.keyboards import admin_flow_menu, admin_menu, broadcast_confirmation
+from app.services.broadcast import send_broadcast
 from app.states import AdminFlow
 
 router = Router(name="admin")
@@ -53,6 +53,38 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
 
     action = callback.data.split(":", 1)[1]
     if action == "home":
+        return
+    if action == "broadcast_send":
+        data = await state.get_data()
+        draft = data.get("broadcast_text", "")
+        if not draft:
+            await state.clear()
+            await callback.answer("Черновик рассылки не найден", show_alert=True)
+            return
+        await state.clear()
+        recipients = await get_user_ids(notifications_only=True)
+        status = await callback.message.edit_text(
+            f"📣 <b>Рассылка запущена</b>\n\nПолучателей: {len(recipients)}. Это может занять некоторое время."
+        )
+        result = await send_broadcast(callback.bot, recipients, draft)
+        await log_admin_action(
+            callback.from_user.id,
+            f"broadcast:total={result.total},sent={result.sent},blocked={result.blocked},failed={result.failed}",
+        )
+        await status.edit_text(
+            "<b>Рассылка завершена</b>\n\n"
+            f"👥 Получателей: {result.total}\n"
+            f"✅ Доставлено: {result.sent}\n"
+            f"🚫 Недоступны: {result.blocked}\n"
+            f"⚠️ Ошибки: {result.failed}",
+            reply_markup=admin_menu(),
+        )
+        await callback.answer("Рассылка завершена")
+        return
+    if action == "broadcast_cancel":
+        await state.clear()
+        await callback.message.edit_text("Рассылка отменена.", reply_markup=admin_menu())
+        await callback.answer("Отменено")
         return
     if action == "cancel":
         await state.clear()
@@ -226,20 +258,16 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
     if not text:
         await message.answer("Сообщение не должно быть пустым. Попробуйте ещё раз.")
         return
-    await state.clear()
-    user_ids = await get_user_ids(notifications_only=True)
-    sent = failed = 0
-    status = await message.answer(f"📣 Начинаю рассылку для {len(user_ids)} пользователей…")
-    for user_id in user_ids:
-        try:
-            await message.bot.send_message(user_id, text, parse_mode=None)
-            sent += 1
-        except Exception as exc:
-            failed += 1
-            logger.warning("Broadcast to %s failed: %s", user_id, exc)
-        await asyncio.sleep(0.05)
-    await log_admin_action(message.from_user.id, f"broadcast:sent={sent},failed={failed}")
-    await status.edit_text(f"<b>Рассылка завершена</b>\n\n✅ Доставлено: {sent}\n⚠️ Не доставлено: {failed}")
+    await state.update_data(broadcast_text=text)
+    recipients = await get_user_ids(notifications_only=True)
+    await state.set_state(AdminFlow.broadcast_confirm)
+    await message.answer(
+        "<b>Предпросмотр рассылки</b>\n\n"
+        f"{text[:3000]}\n\n"
+        f"Получателей с включёнными уведомлениями: <b>{len(recipients)}</b>\n\n"
+        "Отправить сообщение всем выбранным пользователям?",
+        reply_markup=broadcast_confirmation(),
+    )
 
 
 @router.message(F.text == "/cancel")
