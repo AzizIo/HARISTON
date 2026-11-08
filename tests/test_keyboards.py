@@ -39,3 +39,20 @@ def test_news_management_has_edit_and_delete_actions():
         for button in row
     }
     assert {"admin:news_edit:7", "admin:news_delete:7", "admin:news_edit:8", "admin:news_delete:8"} <= callbacks
+
+
+def test_content_management_menu_exposes_all_content_types():
+    from app.keyboards import content_type_menu
+
+    markup = content_type_menu()
+    callbacks = {
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+    }
+    assert {
+        "admin:manage:channels",
+        "admin:manage:lessons",
+        "admin:manage:team",
+        "admin:manage:media",
+    } <= callbacks
