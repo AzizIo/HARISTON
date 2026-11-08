@@ -33,6 +33,13 @@ async def init_db() -> None:
                 url TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS required_channels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                chat_id TEXT NOT NULL UNIQUE,
+                invite_url TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS lessons (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
@@ -440,3 +447,34 @@ async def get_dashboard_stats() -> dict[str, int]:
         )).fetchone()
         result["referrals"] = int(referrals[0])
         return result
+
+
+
+async def add_required_channel(title: str, chat_id: str, invite_url: str) -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            """INSERT INTO required_channels (title, chat_id, invite_url, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (title, chat_id, invite_url, now),
+        )
+        await db.commit()
+        return int(cursor.lastrowid)
+
+
+async def get_required_channels():
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT id, title, chat_id, invite_url FROM required_channels ORDER BY id"
+        )
+        return await cursor.fetchall()
+
+
+async def delete_required_channel(channel_id: int) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        cursor = await db.execute(
+            "DELETE FROM required_channels WHERE id=?", (channel_id,)
+        )
+        await db.commit()
+        return cursor.rowcount > 0

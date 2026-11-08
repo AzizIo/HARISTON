@@ -10,8 +10,13 @@ from app.database import (
     get_referral_stats, get_site_setting,
 )
 from app.keyboards import back_menu, main_menu, notification_menu
+from app.services.subscriptions import (
+    RequiredSubscriptionMiddleware, get_missing_required_channels,
+    required_channels_keyboard,
+)
 
 router = Router(name="user")
+router.callback_query.middleware(RequiredSubscriptionMiddleware())
 
 WELCOME = (
     "<b>HARISTON — больше, чем игра.</b>\n\n"
@@ -28,7 +33,34 @@ async def start(message: Message) -> None:
     payload = parts[1].strip() if len(parts) > 1 else ""
     invite_code = payload.removeprefix("ref_") if payload.startswith("ref_") else None
     await register_user(user.id, user.username, user.full_name, invite_code)
+    missing = await get_missing_required_channels(message.bot, user.id)
+    if missing and user.id not in settings.admin_ids:
+        await message.answer(
+            "🔐 <b>Доступ к HARISTON</b>\n\n"
+            "Чтобы пользоваться ботом, подпишитесь на все каналы ниже, "
+            "а затем нажмите «Проверить подписку».",
+            reply_markup=required_channels_keyboard(missing),
+        )
+        return
     await message.answer(WELCOME, reply_markup=main_menu(user.id in settings.admin_ids))
+
+
+@router.callback_query(F.data == "sub:check")
+async def check_required_subscription(callback: CallbackQuery) -> None:
+    missing = await get_missing_required_channels(callback.bot, callback.from_user.id)
+    if missing and callback.from_user.id not in settings.admin_ids:
+        await callback.message.edit_text(
+            "🔐 <b>Подписка пока не подтверждена</b>\n\n"
+            "Подпишитесь на каждый канал и нажмите кнопку проверки ещё раз.",
+            reply_markup=required_channels_keyboard(missing),
+        )
+        await callback.answer("Не все подписки найдены.", show_alert=True)
+        return
+    await callback.message.edit_text(
+        WELCOME,
+        reply_markup=main_menu(callback.from_user.id in settings.admin_ids),
+    )
+    await callback.answer("Подписка подтверждена!")
 
 
 @router.callback_query(F.data == "menu:home")

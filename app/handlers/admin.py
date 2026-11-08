@@ -1,5 +1,8 @@
 from html import escape
 
+import aiosqlite
+from aiogram.exceptions import TelegramAPIError
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -10,12 +13,14 @@ from app.database import (
     get_user_ids, log_admin_action, record_broadcast, delete_news, update_news,
     set_site_setting, get_channels, get_lessons, get_team, get_media_items,
     delete_channel, delete_lesson, delete_team_member, delete_media_item,
-    get_dashboard_stats, get_broadcast_history,
+    get_dashboard_stats, get_broadcast_history, add_required_channel,
+    get_required_channels, delete_required_channel,
 )
 from app.keyboards import (
     admin_flow_menu, admin_menu, broadcast_confirmation,
     broadcast_category_menu, news_management, confirm_news_delete, site_settings_menu,
     content_type_menu, content_items_menu, confirm_content_delete,
+    required_channels_admin_menu, confirm_required_channel_delete,
 )
 from app.services.broadcast import send_broadcast
 from app.states import AdminFlow
@@ -97,6 +102,68 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         await callback.message.edit_text("<b>⚙️ HARISTON · Панель управления</b>\n\nДействие отменено. Выберите следующий шаг:", reply_markup=admin_menu())
         await callback.answer("Отменено")
+        return
+    if action == "required_channels":
+        await state.clear()
+        items = await get_required_channels()
+        if items:
+            rows = "\n".join(
+                f"• <b>{escape(item['title'])}</b> · <code>{escape(item['chat_id'])}</code>"
+                for item in items
+            )
+        else:
+            rows = "Пока обязательные каналы не добавлены."
+        await callback.message.edit_text(
+            "🔐 <b>Обязательная подписка</b>\n\n"
+            "Пользователь получит доступ к разделам бота только после подписки на все каналы. "
+            "Бот должен быть администратором каждого канала.\n\n"
+            + rows,
+            reply_markup=required_channels_admin_menu(items),
+        )
+        await callback.answer()
+        return
+    if action == "required_channel_add":
+        await state.clear()
+        await state.set_state(AdminFlow.required_channel_title)
+        await callback.message.edit_text(
+            "➕ <b>Новый канал обязательной подписки</b>\n\n"
+            "Шаг 1 из 3. Отправьте отображаемое название канала.",
+            reply_markup=admin_flow_menu(),
+        )
+        await callback.answer()
+        return
+    if action.startswith("required_channel_delete_confirm:"):
+        try:
+            channel_id = int(action.rsplit(":", 1)[1])
+        except ValueError:
+            await callback.answer("Некорректный идентификатор", show_alert=True)
+            return
+        deleted = await delete_required_channel(channel_id)
+        if deleted:
+            await log_admin_action(callback.from_user.id, f"deleted_required_channel:{channel_id}")
+        items = await get_required_channels()
+        await callback.message.edit_text(
+            "🗑 Канал удалён из обязательной подписки." if deleted else "Канал уже отсутствует.",
+            reply_markup=required_channels_admin_menu(items),
+        )
+        await callback.answer()
+        return
+    if action.startswith("required_channel_delete:"):
+        try:
+            channel_id = int(action.rsplit(":", 1)[1])
+        except ValueError:
+            await callback.answer("Некорректный идентификатор", show_alert=True)
+            return
+        items = await get_required_channels()
+        selected = next((item for item in items if int(item["id"]) == channel_id), None)
+        if selected is None:
+            await callback.answer("Канал не найден", show_alert=True)
+            return
+        await callback.message.edit_text(
+            f"Удалить <b>{escape(selected['title'])}</b> из списка обязательной подписки?",
+            reply_markup=confirm_required_channel_delete(channel_id),
+        )
+        await callback.answer()
         return
     if action == "manage_content":
         await state.clear()
@@ -631,3 +698,88 @@ async def team_photo(message: Message, state: FSMContext) -> None:
     await log_admin_action(message.from_user.id, f"added_team_member:{item_id}")
     await state.clear()
     await message.answer("✅ Карточка участника добавлена.")
+
+
+
+@router.message(AdminFlow.required_channel_title)
+async def required_channel_title(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    title = (message.text or "").strip()
+    if not title or len(title) > 100:
+        await message.answer("Название должно содержать от 1 до 100 символов.")
+        return
+    await state.update_data(required_channel_title=title)
+    await state.set_state(AdminFlow.required_channel_chat_id)
+    await message.answer(
+        "Шаг 2 из 3. Отправьте @username канала или его числовой chat_id "
+        "(например, -1001234567890).\n"
+        "Добавьте бота в канал администратором до продолжения."
+    )
+
+
+@router.message(AdminFlow.required_channel_chat_id)
+async def required_channel_chat_id(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    chat_id = (message.text or "").strip()
+    if not ((chat_id.startswith("@") and len(chat_id) > 1) or chat_id.lstrip("-").isdigit()):
+        await message.answer("Укажите @username публичного канала или числовой chat_id.")
+        return
+    await state.update_data(required_channel_chat_id=chat_id)
+    await state.set_state(AdminFlow.required_channel_invite_url)
+    await message.answer(
+        "Шаг 3 из 3. Отправьте ссылку для вступления (https://t.me/...).\n"
+        "Для публичного канала можно отправить «-», чтобы использовать его публичную ссылку."
+    )
+
+
+@router.message(AdminFlow.required_channel_invite_url)
+async def required_channel_invite_url(message: Message, state: FSMContext) -> None:
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await deny(message)
+        return
+    data = await state.get_data()
+    invite_url = (message.text or "").strip()
+    if invite_url != "-" and not invite_url.startswith("https://t.me/"):
+        await message.answer("Нужна ссылка Telegram вида https://t.me/... или «-» для публичного канала.")
+        return
+    chat_id = data["required_channel_chat_id"]
+    try:
+        chat = await message.bot.get_chat(chat_id)
+        bot_member = await message.bot.get_chat_member(chat.id, message.bot.id)
+    except TelegramAPIError:
+        await message.answer(
+            "Не удалось проверить канал. Проверьте chat_id и убедитесь, что бот добавлен в канал администратором."
+        )
+        return
+    if bot_member.status not in {"administrator", "creator"}:
+        await message.answer(
+            "Бот найден в канале, но не является администратором. Назначьте его администратором и повторите."
+        )
+        return
+    if invite_url == "-":
+        if not chat.username:
+            await message.answer("У канала нет публичного username. Отправьте приватную invite-ссылку.")
+            return
+        invite_url = f"https://t.me/{chat.username}"
+    try:
+        channel_id = await add_required_channel(
+            data["required_channel_title"], str(chat.id), invite_url
+        )
+    except aiosqlite.IntegrityError:
+        await message.answer("Этот канал уже добавлен в список обязательной подписки.")
+        return
+    await log_admin_action(message.from_user.id, f"added_required_channel:{channel_id}")
+    await state.clear()
+    items = await get_required_channels()
+    await message.answer(
+        f"✅ Канал <b>{escape(data['required_channel_title'])}</b> добавлен. "
+        "Теперь новые пользователи должны подписаться на него для доступа к боту.",
+        reply_markup=required_channels_admin_menu(items),
+    )
