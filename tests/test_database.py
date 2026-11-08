@@ -16,7 +16,7 @@ async def test_register_user_is_idempotent_and_creates_referral_code(initialized
 async def test_referral_is_attributed_only_to_new_user(initialized_db):
     db = initialized_db
     inviter_code = await db.register_user(101, "inviter", "Inviter")
-    await db.register_user(202, "friend", "Friend", f"ref_{inviter_code}")
+    await db.register_user(202, "friend", "Friend", inviter_code)
 
     assert await db.get_referral_stats(101) == 1
     await db.register_user(202, "friend2", "Friend Updated")
@@ -74,3 +74,21 @@ async def test_broadcast_history_is_persisted(initialized_db):
     rows = await db.get_broadcast_history()
     assert len(rows) == 1
     assert (rows[0]["total"], rows[0]["sent"], rows[0]["blocked"], rows[0]["failed"]) == (5, 3, 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_media_items_are_persisted_and_deleted(initialized_db):
+    db = initialized_db
+    media_id = await db.add_media_item("Trailer", "telegram-file-id", "video", "First look", 1001)
+    items = await db.get_media_items()
+    assert len(items) == 1
+    assert items[0]["title"] == "Trailer"
+    assert items[0]["file_id"] == "telegram-file-id"
+    assert await db.delete_media_item(media_id) is True
+    assert await db.delete_media_item(media_id) is False
+
+
+@pytest.mark.asyncio
+async def test_media_type_is_validated(initialized_db):
+    with pytest.raises(ValueError, match="Unsupported"):
+        await initialized_db.add_media_item("Bad", "file", "audio", "", 1001)
