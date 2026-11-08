@@ -8,6 +8,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.config import settings
 from app.database import get_required_channels
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class RequiredSubscriptionMiddleware(BaseMiddleware):
         if isinstance(event, CallbackQuery) and event.data == "sub:check":
             return await handler(event, data)
         user = getattr(event, "from_user", None)
-        if user is None:
+        if user is None or user.id in settings.admin_ids:
             return await handler(event, data)
         missing = await get_missing_required_channels(data["bot"], user.id)
         if not missing:
