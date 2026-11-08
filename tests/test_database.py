@@ -123,3 +123,23 @@ async def test_init_db_migrates_legacy_users_table(tmp_path, monkeypatch):
     code = await database.register_user(77, "legacy", "Legacy")
     assert code
     assert await database.get_referral_code(77) == code
+
+
+@pytest.mark.asyncio
+async def test_site_settings_are_upserted(initialized_db):
+    db = initialized_db
+    await db.set_site_setting("about", "First")
+    await db.set_site_setting("about", "Updated")
+    assert await db.get_site_setting("about") == "Updated"
+    assert await db.get_site_setting("missing", "fallback") == "fallback"
+
+
+@pytest.mark.asyncio
+async def test_other_content_types_can_be_deleted(initialized_db):
+    db = initialized_db
+    channel_id = await db.add_channel("Official", "https://t.me/example", "")
+    lesson_id = await db.add_lesson("Guide", "Body", "Basics")
+    member_id = await db.add_team_member("Alex", "Developer", "", "")
+    assert await db.delete_channel(channel_id)
+    assert await db.delete_lesson(lesson_id)
+    assert await db.delete_team_member(member_id)
