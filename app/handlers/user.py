@@ -85,16 +85,30 @@ async def education(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "menu:team")
 async def team(callback: CallbackQuery) -> None:
     items = (await get_team())[:10]
-    if items:
-        blocks = []
-        for item in items:
-            contact = f"\n<a href=\"{escape(item['contact_url'], quote=True)}\">Связаться</a>" if item["contact_url"] else ""
-            blocks.append(f"<b>{escape(item['name'])}</b>\n{escape(item['role'])}\n{escape(item['description'][:200])}{contact}")
-        text = "<b>👥 Команда HARISTON</b>\n\n" + "\n\n".join(blocks)
-    else:
-        text = "<b>👥 Команда HARISTON</b>\n\nКарточки команды скоро появятся."
-    await callback.message.edit_text(text, reply_markup=back_menu(), disable_web_page_preview=True)
+    await callback.message.edit_text(
+        "<b>👥 Команда HARISTON</b>\n\nКарточки участников проекта:",
+        reply_markup=back_menu(),
+    )
     await callback.answer()
+    if not items:
+        await callback.message.answer("Информация о команде скоро появится.")
+        return
+
+    for item in items:
+        caption = (
+            f"<b>{escape(item['name'])}</b>\n"
+            f"{escape(item['role'])}\n"
+            f"{escape(item['description'][:500])}"
+        )
+        if item["contact_url"]:
+            caption += (
+                '\n<a href="' + escape(item["contact_url"], quote=True)
+                + '">Связаться</a>'
+            )
+        if item["photo_file_id"]:
+            await callback.message.answer_photo(item["photo_file_id"], caption=caption)
+        else:
+            await callback.message.answer(caption, disable_web_page_preview=True)
 
 
 @router.callback_query(F.data == "menu:notifications")
