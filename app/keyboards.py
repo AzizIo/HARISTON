@@ -31,10 +31,13 @@ def admin_menu() -> InlineKeyboardMarkup:
         ("📊 Статистика", "admin:stats"),
         ("📰 Создать новость", "admin:news_new"),
         ("📚 Последние новости", "admin:news_list"),
+        ("📢 Добавить канал", "admin:channel_new"),
+        ("🎓 Добавить урок", "admin:lesson_new"),
+        ("👤 Добавить сотрудника", "admin:team_new"),
         ("📣 Рассылка", "admin:broadcast"),
         ("👥 Пользователи", "admin:users"),
         ("⬅️ Главное меню", "menu:home"),
     ]:
         kb.button(text=text, callback_data=data)
-    kb.adjust(2, 2, 2)
+    kb.adjust(2, 2, 2, 2, 1)
     return kb.as_markup()
