@@ -12,7 +12,7 @@ from app.database import (
 )
 from app.keyboards import (
     admin_flow_menu, admin_menu, broadcast_confirmation,
-    broadcast_category_menu, news_management, confirm_news_delete,
+    broadcast_category_menu, news_management, confirm_news_delete, site_settings_menu,
 )
 from app.services.broadcast import send_broadcast
 from app.states import AdminFlow
@@ -201,11 +201,25 @@ async def receive_news_body(message: Message, state: FSMContext) -> None:
     if not body:
         await message.answer("Текст новости не должен быть пустым. Отправьте текст ещё раз.")
         return
+    if len(body) > 3800:
+        await message.answer("Текст новости слишком длинный для автоматического уведомления. Максимум 3800 символов.")
+        return
     data = await state.get_data()
     news_id = await add_news(data["news_title"], body, message.from_user.id)
     await log_admin_action(message.from_user.id, f"published_news:{news_id}")
+    recipients = await get_user_ids(notifications_only=True, category="news")
+    delivery = await send_broadcast(
+        message.bot, recipients, f"📰 {data['news_title']}\n\n{body}"
+    )
+    await record_broadcast(
+        message.from_user.id, delivery.total, delivery.sent,
+        delivery.blocked, delivery.failed,
+    )
     await state.clear()
-    await message.answer(f"✅ Новость <b>#{news_id}</b> опубликована и доступна в разделе «Новости».")
+    await message.answer(
+        f"✅ Новость <b>#{news_id}</b> опубликована.\\n"
+        f"🔔 Уведомления: {delivery.sent}/{delivery.total} доставлено."
+    )
 
 
 @router.message(AdminFlow.channel_title)
@@ -410,8 +424,19 @@ async def media_upload(message: Message, state: FSMContext) -> None:
         (message.caption or "").strip(), message.from_user.id,
     )
     await log_admin_action(message.from_user.id, f"added_media:{media_id}")
+    recipients = await get_user_ids(notifications_only=True, category="media")
+    delivery = await send_broadcast(
+        message.bot, recipients, f"🎬 Новый материал HARISTON MEDIA: {data['media_title']}"
+    )
+    await record_broadcast(
+        message.from_user.id, delivery.total, delivery.sent,
+        delivery.blocked, delivery.failed,
+    )
     await state.clear()
-    await message.answer(f"✅ Материал HARISTON MEDIA #{media_id} добавлен.")
+    await message.answer(
+        f"✅ Материал HARISTON MEDIA #{media_id} добавлен.\n"
+        f"🔔 Уведомления: {delivery.sent}/{delivery.total} доставлено."
+    )
 
 
 @router.message(AdminFlow.news_edit_title)
