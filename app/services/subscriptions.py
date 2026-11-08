@@ -4,7 +4,8 @@ import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup
+from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.database import get_required_channels
@@ -51,3 +52,37 @@ def required_channels_keyboard(channels: list[dict]) -> InlineKeyboardMarkup:
     builder.button(text="🔄 Проверить подписку", callback_data="sub:check")
     builder.adjust(1)
     return builder.as_markup()
+
+
+
+class RequiredSubscriptionMiddleware(BaseMiddleware):
+    """Block user-facing callbacks until all mandatory channel memberships exist."""
+
+    async def __call__(self, handler, event, data):
+        if isinstance(event, CallbackQuery) and event.data == "sub:check":
+            return await handler(event, data)
+        user = getattr(event, "from_user", None)
+        if user is None:
+            return await handler(event, data)
+        missing = await get_missing_required_channels(data["bot"], user.id)
+        if not missing:
+            return await handler(event, data)
+
+        message = (
+            "🔐 <b>Доступ к HARISTON</b>\\n\\n"
+            "Чтобы пользоваться ботом, подпишитесь на все каналы ниже, "
+            "а затем нажмите «Проверить подписку»."
+        )
+        if isinstance(event, CallbackQuery):
+            if event.message:
+                try:
+                    await event.message.edit_text(
+                        message, reply_markup=required_channels_keyboard(missing)
+                    )
+                except TelegramAPIError:
+                    await event.message.answer(
+                        message, reply_markup=required_channels_keyboard(missing)
+                    )
+            await event.answer("Сначала подпишитесь на обязательные каналы.", show_alert=True)
+            return None
+        return await handler(event, data)
