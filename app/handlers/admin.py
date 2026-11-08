@@ -107,16 +107,16 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         items = await get_required_channels()
         if items:
-            rows = "\\n".join(
+            rows = "\n".join(
                 f"• <b>{escape(item['title'])}</b> · <code>{escape(item['chat_id'])}</code>"
                 for item in items
             )
         else:
             rows = "Пока обязательные каналы не добавлены."
         await callback.message.edit_text(
-            "🔐 <b>Обязательная подписка</b>\\n\\n"
+            "🔐 <b>Обязательная подписка</b>\n\n"
             "Пользователь получит доступ к разделам бота только после подписки на все каналы. "
-            "Бот должен быть администратором каждого канала.\\n\\n"
+            "Бот должен быть администратором каждого канала.\n\n"
             + rows,
             reply_markup=required_channels_admin_menu(items),
         )
@@ -126,7 +126,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         await state.set_state(AdminFlow.required_channel_title)
         await callback.message.edit_text(
-            "➕ <b>Новый канал обязательной подписки</b>\\n\\n"
+            "➕ <b>Новый канал обязательной подписки</b>\n\n"
             "Шаг 1 из 3. Отправьте отображаемое название канала.",
             reply_markup=admin_flow_menu(),
         )
@@ -715,7 +715,7 @@ async def required_channel_title(message: Message, state: FSMContext) -> None:
     await state.set_state(AdminFlow.required_channel_chat_id)
     await message.answer(
         "Шаг 2 из 3. Отправьте @username канала или его числовой chat_id "
-        "(например, -1001234567890).\\n"
+        "(например, -1001234567890).\n"
         "Добавьте бота в канал администратором до продолжения."
     )
 
@@ -733,7 +733,7 @@ async def required_channel_chat_id(message: Message, state: FSMContext) -> None:
     await state.update_data(required_channel_chat_id=chat_id)
     await state.set_state(AdminFlow.required_channel_invite_url)
     await message.answer(
-        "Шаг 3 из 3. Отправьте ссылку для вступления (https://t.me/...).\\n"
+        "Шаг 3 из 3. Отправьте ссылку для вступления (https://t.me/...).\n"
         "Для публичного канала можно отправить «-», чтобы использовать его публичную ссылку."
     )
 
