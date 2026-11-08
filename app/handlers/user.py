@@ -36,7 +36,7 @@ async def start(message: Message) -> None:
     missing = await get_missing_required_channels(message.bot, user.id)
     if missing and user.id not in settings.admin_ids:
         await message.answer(
-            "🔐 <b>Доступ к HARISTON</b>\\n\\n"
+            "🔐 <b>Доступ к HARISTON</b>\n\n"
             "Чтобы пользоваться ботом, подпишитесь на все каналы ниже, "
             "а затем нажмите «Проверить подписку».",
             reply_markup=required_channels_keyboard(missing),
@@ -50,7 +50,7 @@ async def check_required_subscription(callback: CallbackQuery) -> None:
     missing = await get_missing_required_channels(callback.bot, callback.from_user.id)
     if missing and callback.from_user.id not in settings.admin_ids:
         await callback.message.edit_text(
-            "🔐 <b>Подписка пока не подтверждена</b>\\n\\n"
+            "🔐 <b>Подписка пока не подтверждена</b>\n\n"
             "Подпишитесь на каждый канал и нажмите кнопку проверки ещё раз.",
             reply_markup=required_channels_keyboard(missing),
         )
