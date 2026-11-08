@@ -21,3 +21,4 @@ class AdminFlow(StatesGroup):
     team_role = State()
     team_description = State()
     team_contact = State()
+    team_photo = State()
