@@ -56,3 +56,13 @@ def test_content_management_menu_exposes_all_content_types():
         "admin:manage:team",
         "admin:manage:media",
     } <= callbacks
+
+
+
+def test_admin_menu_exposes_required_subscription_management():
+    callbacks = {
+        button.callback_data
+        for row in admin_menu().inline_keyboard
+        for button in row
+    }
+    assert "admin:required_channels" in callbacks
