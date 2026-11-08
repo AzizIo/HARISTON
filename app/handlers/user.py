@@ -4,7 +4,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.config import settings
 from app.database import (
-    get_channels, get_lessons, get_news, get_team, register_user,
+    get_channels, get_lessons, get_news, get_team, get_media_items, register_user,
     get_notification_preferences, set_notification_preference,
     get_referral_stats,
 )
@@ -145,4 +145,32 @@ async def static_sections(callback: CallbackQuery) -> None:
         "contact": "<b>💬 Связаться с командой</b>\n\nКонтакты администрации будут опубликованы здесь.",
     }
     await callback.message.edit_text(pages.get(section, "Раздел не найден."), reply_markup=back_menu())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "menu:media")
+async def media(callback: CallbackQuery) -> None:
+    items = await get_media_items(10)
+    if not items:
+        await callback.message.edit_text(
+            "<b>🎬 HARISTON MEDIA</b>\n\nВидео, изображения и материалы проекта появятся здесь.",
+            reply_markup=back_menu(),
+        )
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        "<b>🎬 HARISTON MEDIA</b>\n\nПоследние материалы отправлены ниже.",
+        reply_markup=back_menu(),
+    )
+    for item in reversed(items):
+        caption = f"<b>{item['title']}</b>"
+        if item["caption"]:
+            caption += f"\n{item['caption']}"
+        if item["media_type"] == "photo":
+            await callback.message.answer_photo(item["file_id"], caption=caption)
+        elif item["media_type"] == "video":
+            await callback.message.answer_video(item["file_id"], caption=caption)
+        else:
+            await callback.message.answer_document(item["file_id"], caption=caption)
     await callback.answer()
