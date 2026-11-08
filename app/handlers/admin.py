@@ -1,3 +1,4 @@
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -108,7 +109,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
     elif action == "news_list":
         items = await get_news(10)
         text = "<b>📰 Управление публикациями</b>\n\n" + (
-            "\n\n".join(f"<b>#{item['id']} · {item['title']}</b>\n{item['body'][:180]}" for item in items)
+            "\n\n".join(f"<b>#{item['id']} · {escape(item['title'])}</b>\n{escape(item['body'][:180])}" for item in items)
             if items else "Новостей пока нет."
         )
         await callback.message.edit_text(text, reply_markup=news_management(items))
@@ -136,7 +137,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(edit_news_id=news_id)
         await state.set_state(AdminFlow.news_edit_title)
         await callback.message.edit_text(
-            f"Текущий заголовок: <b>{item['title']}</b>\n\nОтправьте новый заголовок.",
+            f"Текущий заголовок: <b>{escape(item['title'])}</b>\n\nОтправьте новый заголовок.",
             reply_markup=admin_flow_menu(),
         )
     elif action == "channel_new":
@@ -345,7 +346,7 @@ async def receive_broadcast(message: Message, state: FSMContext) -> None:
     await state.set_state(AdminFlow.broadcast_confirm)
     await message.answer(
         "<b>Предпросмотр рассылки</b>\n\n"
-        f"{text[:3000]}\n\n"
+        f"{escape(text[:3000])}\n\n"
         f"Категория: <b>{category}</b>\n"
         f"Категория: <b>{category}</b>\n"
         f"Получателей с включёнными уведомлениями: <b>{len(recipients)}</b>\n\n"
